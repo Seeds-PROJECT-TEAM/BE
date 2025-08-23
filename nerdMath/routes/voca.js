@@ -110,18 +110,18 @@ router.get('/test', async (req, res) => {
       .sort(() => 0.5 - Math.random())
       .slice(0, Math.min(testSize, vocabularies.length));
 
-    // 문제 생성 (영어→한글, 한글→영어 랜덤 혼합)
+    // 문제 생성 (영어→한글, 한글→영어 랜덤)
     const problems = selectedVocabularies.map((voca, index) => {
       const isWordToMeaning = Math.random() < 0.5;
       
       return {
-        problemId: `temp_${Date.now()}_${index}`, // 임시 ID
+        problemId: `vocab_${voca._id}_${index}`, // 간단한 임시 ID
         vocaId: voca._id.toString(),
         question: isWordToMeaning 
           ? `${voca.word}의 뜻을 쓰세요`
           : `${voca.meaning}을 영어로 쓰세요`,
         correctAnswer: isWordToMeaning ? voca.meaning : voca.word,
-        explanation: voca.etymology,
+        explanation: voca.etymology || '어원 정보가 없습니다.',
         questionType: isWordToMeaning ? 'word_to_meaning' : 'meaning_to_word'
       };
     });

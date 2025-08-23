@@ -37,7 +37,7 @@ const problemSchema = new mongoose.Schema({
   cognitiveType: {
     type: String,
     required: true,
-    enum: ['understanding', 'application', 'analysis', 'evaluation', 'creation']
+    enum: ['understanding', 'application', 'analysis']
   },
   level: {
     type: String,

@@ -7,6 +7,12 @@ const Voca = require('./Voca');
 const DiagnosticTest = require('./DiagnosticTest');
 const DiagnosticAnalysis = require('./DiagnosticAnalysis');
 const Bookmark = require('./Bookmark');
+const LearningTimeLog = require('./LearningTimeLog');
+const Progress = require('./Progress');
+const ActivityLog = require('./ActivityLog');
+const Character = require('./Character');
+const GamificationState = require('./GamificationState');
+const XpTransaction = require('./XpTransaction');
 
 module.exports = {
   Problem,
@@ -17,5 +23,11 @@ module.exports = {
   Voca,
   DiagnosticTest,
   DiagnosticAnalysis,
-  Bookmark
+  Bookmark,
+  LearningTimeLog,
+  Progress,
+  ActivityLog,
+  Character,
+  GamificationState,
+  XpTransaction
 };

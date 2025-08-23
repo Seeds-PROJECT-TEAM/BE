@@ -1,6 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { Unit, Problem, ProblemSet } = require('../models');
+const { Unit, Problem, ProblemSet, AnswerAttempt } = require('../models');
+
+// 문제 정렬 함수
+function sortProblemsByCognitiveType(problems) {
+  const sortOrder = ['understanding', 'application', 'analysis'];
+  const levelOrder = ['easy', 'medium', 'hard'];
+  
+  return problems.sort((a, b) => {
+    // 1. 인지 수준별 정렬
+    const aIndex = sortOrder.indexOf(a.cognitiveType);
+    const bIndex = sortOrder.indexOf(b.cognitiveType);
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    
+    // 2. 난이도별 정렬
+    const aLevelIndex = levelOrder.indexOf(a.level);
+    const bLevelIndex = levelOrder.indexOf(b.level);
+    return aLevelIndex - bLevelIndex;
+  });
+}
 
 // 소단원 목록 조회 (대단원별 필터링)
 router.get('/', async (req, res) => {
@@ -67,10 +85,11 @@ router.get('/:unitId', async (req, res) => {
   }
 });
 
-// 소단원의 첫 번째 문제 + 문제 ID 배열 조회
+// 소단원의 첫 번째 문제 + 문제 ID 배열 조회 (이어풀기 기능 포함)
 router.get('/:unitId/first-problem', async (req, res) => {
   try {
     const { unitId } = req.params;
+    const { userId } = req.query; // 이어풀기용 (선택사항)
     
     // 소단원 존재 확인
     const unit = await Unit.findOne({ unitId });
@@ -88,46 +107,96 @@ router.get('/:unitId/first-problem', async (req, res) => {
       });
     }
 
-    // 첫 번째 문제 조회
-    const firstProblemId = problemSet.problemIds[0];
-    const firstProblem = await Problem.findById(firstProblemId);
+    // 모든 문제 조회
+    const problems = await Problem.find({ _id: { $in: problemSet.problemIds } });
     
-    if (!firstProblem) {
-      return res.status(404).json({
-        error: 'First problem not found'
-      });
-    }
+    // 정렬된 문제 배열
+    const sortedProblems = sortProblemsByCognitiveType(problems);
+    const sortedProblemIds = sortedProblems.map(p => p._id.toString());
 
-    // API 명세에 맞는 응답 형식
-    const problemResponse = {
-      problemId: firstProblem._id.toString(),
-      unitId: firstProblem.unitId ? firstProblem.unitId.toString() : unitId,
-      grade: firstProblem.grade,
-      chapter: firstProblem.chapter,
-      context: firstProblem.context,
-      cognitiveType: firstProblem.cognitiveType,
-      level: firstProblem.level,
-      type: firstProblem.type,
-      tags: firstProblem.tags,
-      content: {
-        stem: { text: firstProblem.content.question },
-        choices: firstProblem.content.options ? firstProblem.content.options.map((option, index) => ({
-          key: String.fromCharCode(9312 + index), // ①, ②, ③...
-          text: option
-        })) : []
-      },
-      imageUrl: firstProblem.imageUrl,
-      createdAt: firstProblem.createdAt ? firstProblem.createdAt.toISOString() : new Date().toISOString(),
-      updatedAt: firstProblem.updatedAt ? firstProblem.updatedAt.toISOString() : new Date().toISOString()
+    // 이어풀기 로직
+    let targetProblem = sortedProblems[0]; // 기본값: 첫 번째 문제
+    let isFirstTime = true;
+    let progress = {
+      completed: 0,
+      total: sortedProblems.length,
+      remaining: sortedProblems.length,
+      percentage: 0.0
     };
 
-    // problemIds 배열을 문자열로 변환
-    const problemIds = problemSet.problemIds.map(id => id.toString());
+    if (userId) {
+      // 사용자가 풀은 문제들 조회 (현재 단원의 문제들만)
+      const answeredProblems = await AnswerAttempt.find({
+        userId: parseInt(userId),
+        unitId: unit._id,
+        mode: 'practice',
+        problemId: { $in: problemSet.problemIds } // 현재 단원 문제만 필터링
+      });
 
-    res.json({
-      problem: problemResponse,
-      problemIds: problemIds
-    });
+      // 중복 제거 (같은 문제를 여러 번 풀었을 수 있음)
+      const uniqueAnsweredIds = [...new Set(answeredProblems.map(a => a.problemId.toString()))];
+      
+      // 다음에 풀 문제 찾기
+      const nextProblem = sortedProblems.find(p => !uniqueAnsweredIds.includes(p._id.toString()));
+      
+      if (nextProblem) {
+        targetProblem = nextProblem;
+        isFirstTime = false;
+        progress = {
+          completed: uniqueAnsweredIds.length,
+          total: sortedProblems.length,
+          remaining: sortedProblems.length - uniqueAnsweredIds.length,
+          percentage: Math.round((uniqueAnsweredIds.length / sortedProblems.length) * 100 * 100) / 100
+        };
+      } else {
+        // 모든 문제를 완료한 경우
+        targetProblem = null;
+        isFirstTime = false;
+        progress = {
+          completed: sortedProblems.length,
+          total: sortedProblems.length,
+          remaining: 0,
+          percentage: 100.0
+        };
+      }
+    }
+
+    // 응답 구성
+    const response = {
+      problem: targetProblem ? {
+        problemId: targetProblem._id.toString(),
+        unitId: targetProblem.unitId ? targetProblem.unitId.toString() : unitId,
+        grade: targetProblem.grade,
+        chapter: targetProblem.chapter,
+        context: targetProblem.context,
+        cognitiveType: targetProblem.cognitiveType,
+        level: targetProblem.level,
+        type: targetProblem.type,
+        tags: targetProblem.tags,
+        content: {
+          stem: { text: targetProblem.content.question },
+          choices: targetProblem.content.options ? targetProblem.content.options.map((option, index) => ({
+            key: String.fromCharCode(9312 + index), // ①, ②, ③...
+            text: option
+          })) : []
+        },
+        imageUrl: targetProblem.imageUrl,
+        createdAt: targetProblem.createdAt ? targetProblem.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: targetProblem.updatedAt ? targetProblem.updatedAt.toISOString() : new Date().toISOString()
+      } : null,
+      problemIds: sortedProblemIds,
+      progress: progress,
+      sortedBy: "cognitiveType",
+      sortOrder: ["understanding", "application", "analysis"],
+      isFirstTime: isFirstTime
+    };
+
+    // 완료된 경우 메시지 추가
+    if (targetProblem === null) {
+      response.message = "모든 문제를 완료했습니다!";
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error fetching first problem:', error);
     res.status(500).json({

@@ -13,7 +13,10 @@ const answerAttemptSchema = new mongoose.Schema({
   problemId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Problem',
-    required: true
+    required: function() {
+      // 어휘 테스트 모드에서는 problemId가 없을 수 있음
+      return this.mode !== 'vocab_test';
+    }
   },
   vocaId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -31,7 +34,10 @@ const answerAttemptSchema = new mongoose.Schema({
   unitId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Unit',
-    required: true
+    required: function() {
+      // 어휘 테스트에서는 unitId가 null일 수 있음 (빈출 어휘)
+      return this.mode !== 'vocab_test';
+    }
   },
   userAnswer: {
     value: {

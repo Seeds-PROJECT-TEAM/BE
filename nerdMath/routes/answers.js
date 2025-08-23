@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { Problem, AnswerAttempt, Unit } = require('../models');
+const { Problem, AnswerAttempt, Unit, LearningTimeLog, Voca } = require('../models');
+const { awardXp } = require('../utils/gamification');
 
 // 채점 + 해설 API
 router.post('/check', async (req, res) => {
@@ -12,28 +13,65 @@ router.post('/check', async (req, res) => {
       problemId, 
       userAnswer, 
       durationSeconds,
-      problemOrderIndex 
+      problemOrderIndex,
+      userId,
+      vocaId
     } = req.body;
 
     const idempotencyKey = req.headers['idempotency-key'];
 
     // 필수 필드 검증
-    if (!mode || !unitId || !problemId || !userAnswer || !userAnswer.value) {
+    if (!mode || !userAnswer || !userAnswer.value || !userId) {
       return res.status(422).json({ 
-        error: 'Missing required fields: mode, unitId, problemId, userAnswer.value' 
+        error: 'Missing required fields: mode, userAnswer.value, userId' 
       });
     }
+    
+    // mode에 따른 필수 필드 검증
+    if (mode === 'vocab_test') {
+      if (!vocaId) {
+        return res.status(422).json({ 
+          error: 'Missing required fields: vocaId for vocab_test mode' 
+        });
+      }
+    } else {
+      if (!problemId) {
+        return res.status(422).json({ 
+          error: 'Missing required fields: problemId for non-vocab_test mode' 
+        });
+      }
+    }
 
-    // 문제 조회
-    const problem = await Problem.findById(problemId);
+    // 단위 조회 (빈출 어휘는 unitId가 없을 수 있음)
+    let unit = null;
+    if (unitId) {
+      unit = await Unit.findById(unitId);
+      if (!unit) {
+        return res.status(404).json({ error: 'Unit not found' });
+      }
+    }
+
+    // 어휘 테스트인지 확인
+    let problem = null;
+    let voca = null;
+    
+    if (mode === 'vocab_test') {
+      // 어휘 테스트: vocaId로 조회
+      if (!vocaId) {
+        return res.status(400).json({ error: 'vocaId is required for vocab_test mode' });
+      }
+      voca = await Voca.findById(vocaId);
+      if (!voca) {
+        return res.status(404).json({ error: 'Vocabulary not found' });
+      }
+    } else {
+          // 일반 문제: Problem 조회
+    console.log('Debug - Problem 조회 전, problemId:', problemId);
+    problem = await Problem.findById(problemId);
+    console.log('Debug - Problem 조회 결과:', problem ? '찾음' : '없음');
     if (!problem) {
       return res.status(404).json({ error: 'Problem not found' });
     }
-
-    // 단위 조회 (relatedConcepts용)
-    const unit = await Unit.findById(unitId);
-    if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
     }
 
     // 중복 요청 체크
@@ -48,36 +86,72 @@ router.post('/check', async (req, res) => {
     }
 
     // 채점 로직
+    console.log('Debug - 채점 로직 시작');
     let isCorrect = false;
-    const userAnswerValue = userAnswer.value.trim().toLowerCase();
+    let correctAnswer = '';
+    let explanation = '';
     
-    // correctAnswer를 content에서 가져오기
-    const correctAnswer = problem.content.correctAnswer;
-    if (!correctAnswer) {
-      return res.status(500).json({ error: 'Problem does not have correctAnswer field' });
-    }
-    
-    const correctAnswerValue = correctAnswer.trim().toLowerCase();
+    if (mode === 'vocab_test' && voca) {
+      // 어휘 테스트 채점 로직
+      const question = req.body.question || '';
+      
 
-    if (problem.type === 'multiple_choice') {
-      // 객관식: 선택한 옵션 번호와 정답 비교
-      const selectedOption = userAnswer.selectedOption;
-      const correctOptionIndex = problem.content.options.findIndex(
-        option => option.trim().toLowerCase() === correctAnswerValue
-      );
-      isCorrect = selectedOption === correctOptionIndex;
+      
+      // 한글/영어 질문 모두 지원
+      if (question.includes('뜻을 쓰세요') || question.includes('뜻') || question.includes('의 뜻') || 
+          question.includes('meaning of') || question.includes('What is') || question.includes('meaning')) {
+        // 영어→한글: voca.meaning과 비교 (한글은 대소문자 변환 안 함)
+        correctAnswer = voca.meaning;
+        const userAnswerValue = userAnswer.value.trim();
+        isCorrect = userAnswerValue === voca.meaning.trim();
+      } else if (question.includes('영어로 쓰세요') || question.includes('영어로')) {
+        // 한글→영어: voca.word와 비교 (영어는 대소문자 변환)
+        correctAnswer = voca.word;
+        const userAnswerValue = userAnswer.value.trim().toLowerCase();
+        isCorrect = userAnswerValue === voca.word.trim().toLowerCase();
+      } else {
+        // 기본적으로 영어→한글 문제로 처리
+        correctAnswer = voca.meaning;
+        const userAnswerValue = userAnswer.value.trim();
+        isCorrect = userAnswerValue === voca.meaning.trim();
+      }
+      
+      explanation = voca.etymology || `${voca.word}의 어원 정보가 없습니다.`;
+      
     } else {
-      // 단답식: 답안 텍스트 직접 비교
-      isCorrect = userAnswerValue === correctAnswerValue;
+      // 일반 문제 채점 로직
+      const userAnswerValue = userAnswer.value.trim().toLowerCase();
+      
+      correctAnswer = problem.content.correctAnswer;
+      if (!correctAnswer) {
+        return res.status(500).json({ error: 'Problem does not have correctAnswer field' });
+      }
+      
+      const correctAnswerValue = correctAnswer.trim().toLowerCase();
+
+      if (problem.type === 'multiple_choice') {
+        // 객관식: 선택한 옵션 번호와 정답 비교
+        const selectedOption = userAnswer.selectedOption;
+        const correctOptionIndex = problem.content.options.findIndex(
+          option => option.trim().toLowerCase() === correctAnswerValue
+        );
+        isCorrect = selectedOption === correctOptionIndex;
+      } else {
+        // 단답식: 답안 텍스트 직접 비교
+        isCorrect = userAnswerValue === correctAnswerValue;
+      }
+      
+      explanation = problem.content.explanation;
     }
 
     // AnswerAttempt 문서 생성
     const answerAttempt = new AnswerAttempt({
-      userId: 1, // 임시 사용자 ID (나중에 인증에서 가져올 예정)
-      problemId: problem._id,
+      userId: parseInt(userId),
+      problemId: mode === 'vocab_test' ? null : problem._id, // 어휘 테스트는 problemId null
+      vocaId: mode === 'vocab_test' ? voca._id : null, // 어휘 테스트는 vocaId 설정
       mode: mode,
       setId: setId,
-      unitId: unit._id,
+      unitId: unit ? unit._id : null,
       userAnswer: {
         value: userAnswer.value,
         selectedOption: userAnswer.selectedOption,
@@ -87,26 +161,139 @@ router.post('/check', async (req, res) => {
       scoredAt: new Date(),
       explanationShown: false,
       problemOrderIndex: problemOrderIndex,
-      idempotencyKey: idempotencyKey,
-      bookmarked: false
+      idempotencyKey: idempotencyKey
     });
 
     // DB에 저장
     await answerAttempt.save();
 
-    // 응답 구성 - explanation도 content에서 가져오기
-    const explanation = problem.content.explanation;
+    // 학습 시간 기록 종료 (문제 풀이 완료)
+    const activeSession = await LearningTimeLog.findOne({
+      userId: parseInt(userId),
+      endedAt: null
+    });
+
+    if (activeSession) {
+      const now = new Date();
+      const durationSeconds = Math.floor((now - activeSession.startedAt) / 1000);
+      
+      activeSession.endedAt = now;
+      activeSession.durationSeconds = durationSeconds;
+      await activeSession.save();
+    }
+
+    // 진행률 업데이트
+    let updatedProgress = null;
+    try {
+      console.log('Debug - 문제 풀이 API: 진행률 업데이트 시작');
+      console.log('Debug - mode:', mode, 'userId:', userId, 'unitId:', unitId);
+      
+      const { updateProgress, getStatus } = require('./progress');
+      const { updateActivityStats } = require('./activity');
+      
+      if (mode === 'vocab_test') {
+        // 어휘 테스트 완료 시 해당 단원/카테고리의 어휘를 100% 완료로 설정
+        
+        // 어휘 데이터 확인
+        const voca = await Voca.findById(vocaId);
+        
+        if (voca.category === 'math_term' && voca.unitId && unit) {
+          // 소단원별 어휘: 테스트 완료 = 해당 단원 어휘 100% 완료
+          updatedProgress = await updateProgress(parseInt(userId), unit._id, 'vocab', 100, 'unit');
+          
+        } else if (voca.category === 'sat_act') {
+          // 빈출 어휘: 테스트 완료 = 빈출 어휘 100% 완료
+          updatedProgress = await updateProgress(parseInt(userId), null, 'vocab', 100, 'frequent');
+        }
+        
+      } else if (mode === 'practice') {
+        // 문제 풀이 진행률 계산
+        const totalProblemsInUnit = await Problem.countDocuments({ unitId: unit._id });
+        const solvedProblemsInUnit = await AnswerAttempt.countDocuments({
+          userId: parseInt(userId),
+          unitId: unit._id,
+          mode: { $ne: 'diagnostic' }
+        });
+        
+        const problemProgress = Math.round((solvedProblemsInUnit / totalProblemsInUnit) * 100);
+        console.log('Debug - 문제 진행률 계산:', { solvedProblemsInUnit, totalProblemsInUnit, problemProgress });
+        updatedProgress = await updateProgress(parseInt(userId), unit._id, 'problem', problemProgress);
+        console.log('Debug - 문제 진행률 업데이트 완료:', updatedProgress);
+      }
+      // diagnostic 모드는 진행률 업데이트 제외
+
+      // 활동 통계 업데이트
+      const today = new Date().toISOString().split('T')[0];
+      await updateActivityStats(parseInt(userId), today, {
+        todaySolved: 1,
+        totalProblems: 1
+      });
+    } catch (error) {
+      console.error('Error updating progress and stats:', error);
+    }
+
+    // 응답 구성
     const response = {
       answerId: answerAttempt._id.toString(),
       isCorrect: isCorrect,
       explanation: {
         explanation: explanation || '해설이 제공되지 않았습니다.'
       },
-      relatedConcepts: problem.tags && problem.tags.length > 0 ? [{
-        unitId: unit._id.toString(),
-        title: unit.title.ko
-      }] : []
+      relatedConcepts: mode === 'vocab_test' 
+        ? (unit ? [{ unitId: unit._id.toString(), title: unit.title.ko }] : [])
+        : (problem.tags && problem.tags.length > 0 ? [{
+            unitId: unit._id.toString(),
+            title: unit.title.ko
+          }] : [])
     };
+
+    // getStatus 함수 정의 (스코프 문제 해결)
+    const getStatus = (progress) => {
+      if (progress >= 100) return 'completed';
+      if (progress > 0) return 'in_progress';
+      return 'not_started';
+    };
+
+    // XP 지급 (diagnostic 모드 제외)
+    let xpResult = null;
+    if (mode !== 'diagnostic') {
+      const idempotencyKey = `answer_check_${userId}_${mode}_${problemId || vocaId}_${Date.now()}`;
+      const reason = mode === 'vocab_test' ? 'vocab_solved' : 'problem_solved';
+      
+      xpResult = await awardXp(
+        parseInt(userId),
+        reason,
+        mode === 'vocab_test' ? vocaId : problemId,
+        idempotencyKey,
+        isCorrect
+      );
+    }
+
+    // mode에 따라 updatedProgress 추가
+    if (mode === 'vocab_test' && updatedProgress) {
+      response.updatedProgress = {
+        vocabProgress: updatedProgress.vocabProgress,
+        status: getStatus(updatedProgress.vocabProgress)
+      };
+    } else if (mode === 'practice' && updatedProgress) {
+      response.updatedProgress = {
+        problemProgress: updatedProgress.problemProgress,
+        status: getStatus(updatedProgress.problemProgress)
+      };
+    }
+    // diagnostic 모드는 updatedProgress 제외
+
+    // XP 지급 결과가 성공한 경우에만 응답에 포함
+    if (xpResult && xpResult.success) {
+      response.xpGained = xpResult.xpGained;
+      response.gamificationUpdate = {
+        level: xpResult.levelUpResult.newLevel,
+        xp: xpResult.levelUpResult.leveledUp ? xpResult.levelUpResult.remainingXp : xpResult.totalXp - xpResult.xpGained,
+        totalXp: xpResult.totalXp,
+        nextLevelXp: xpResult.levelUpResult.leveledUp ? xpResult.levelUpResult.newLevel * 50 + (xpResult.levelUpResult.newLevel - 1) * (xpResult.levelUpResult.newLevel - 2) * 25 : xpResult.levelUpResult.newLevel * 50 + (xpResult.levelUpResult.newLevel - 1) * (xpResult.levelUpResult.newLevel - 2) * 25,
+        leveledUp: xpResult.levelUpResult.leveledUp
+      };
+    }
 
     res.json(response);
 
