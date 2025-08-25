@@ -50,11 +50,10 @@ jobs:
             git pull origin main
           fi
           cd nerdMath
-          # Install Docker Compose if not installed
+          # Install Docker Compose using curl
           if ! command -v docker-compose &> /dev/null; then
-            sudo apt update
-            sudo apt install -y docker-compose-plugin
-            sudo ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
           fi
           docker-compose down || true
           docker-compose up -d --build
