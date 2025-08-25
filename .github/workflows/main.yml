@@ -22,12 +22,15 @@ jobs:
     - name: Install dependencies
       run: |
         cd nerdMath
-        npm ci --prefer-offline --no-audit
-        # Retry if failed due to rate limit
+        # Configure npm to use a different registry
+        npm config set registry https://registry.npmjs.org/
+        npm config set strict-ssl false
+        npm ci --prefer-offline --no-audit --no-fund
+        # Retry if failed
         if [ $? -ne 0 ]; then
-          echo "Retrying npm install after rate limit error..."
-          sleep 30
-          npm ci --prefer-offline --no-audit
+          echo "Retrying npm install..."
+          sleep 10
+          npm ci --prefer-offline --no-audit --no-fund
         fi
         
     - name: Build Docker image
