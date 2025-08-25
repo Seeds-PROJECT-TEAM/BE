@@ -7,28 +7,26 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
         cache: 'npm'
-        cache-dependency-path: './nerdMath/package-lock.json'
-        
+        cache-dependency-path: nerdMath/package-lock.json
+
     - name: Install dependencies
-      run: |
-        cd nerdMath
-        npm ci
-        
+      run: npm ci
+      working-directory: nerdMath
+
     - name: Build Docker image
-      run: |
-        cd nerdMath
-        docker build -t nerdmath .
-      
+      run: docker build -t nerdmath .
+      working-directory: nerdMath
+
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.5
       with:
