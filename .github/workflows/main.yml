@@ -50,9 +50,9 @@ jobs:
             git pull origin main
           fi
           cd nerdMath
-          # Install Docker Compose using snap (simplest method)
-          if ! command -v docker-compose &> /dev/null; then
-            sudo snap install docker-compose
-          fi
-          docker-compose down || true
-          docker-compose up -d --build
+          # Stop existing containers
+          docker stop $(docker ps -q) || true
+          docker rm $(docker ps -aq) || true
+          # Build and run with docker run instead of docker-compose
+          docker build -t nerdmath .
+          docker run -d -p 3000:3000 --name nerdmath-app nerdmath
