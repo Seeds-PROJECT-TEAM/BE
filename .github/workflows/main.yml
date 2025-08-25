@@ -22,7 +22,13 @@ jobs:
     - name: Install dependencies
       run: |
         cd nerdMath
-        npm ci
+        npm ci --prefer-offline --no-audit
+        # Retry if failed due to rate limit
+        if [ $? -ne 0 ]; then
+          echo "Retrying npm install after rate limit error..."
+          sleep 30
+          npm ci --prefer-offline --no-audit
+        fi
         
     - name: Build Docker image
       run: |
