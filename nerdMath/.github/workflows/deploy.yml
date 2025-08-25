@@ -17,19 +17,16 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
+        cache-dependency-path: 'nerdMath/package-lock.json'
         
     - name: Install dependencies
-      run: |
-        cd nerdMath
-        npm ci
+      run: npm ci
       
     # - name: Run tests
     #   run: npm test
       
     - name: Build Docker image
-      run: |
-        cd nerdMath
-        docker build -t nerdmath .
+      run: docker build -t nerdmath .
       
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.5
