@@ -9,10 +9,10 @@ console.log('AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY ? '설�
 console.log('S3_BUCKET_NAME:', process.env.S3_BUCKET_NAME);
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-// 환경 변수가 없으면 하드코딩된 값 사용 (임시 디버깅용)
-const awsRegion = process.env.AWS_REGION || 'ap-southeast-2';
-const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID || 'AKIA4LPCDVFRFFSSLQGD';
-const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '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';
+// 환경 변수 사용 (하드코딩 제거)
+const awsRegion = process.env.AWS_REGION;
+const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
 
 console.log('🔧 사용할 S3 설정:');
 console.log('Region:', awsRegion);
