@@ -3,8 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 
 // DB 연결 및 모델 import
-const { connectDB } = require('./db');
-const { Problem, ProblemSet, AnswerAttempt, Unit } = require('./models');
+const { connectDB } = require('./mongodb/config/database');
+const { Problem, ProblemSet, AnswerAttempt, Unit } = require('./mongodb/models');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -16,6 +16,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key']
 }));
 app.use(express.json());
+
+// 모든 요청에 대한 로깅 미들웨어 추가
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.url} - ${new Date().toISOString()}`);
+  next();
+});
 
 // MongoDB 연결
 connectDB().catch(err => {
@@ -33,19 +39,25 @@ app.get('/', (req, res) => {
 });
 
 
-// 라우터 import
-const problemsRouter = require('./routes/problems');
-const unitsRouter = require('./routes/units');
-const answersRouter = require('./routes/answers');
-const conceptsRouter = require('./routes/concepts');
-const vocaRouter = require('./routes/voca');
-const diagnosticsRouter = require('./routes/diagnostics');
-const bookmarksRouter = require('./routes/bookmarks');
-const learningRouter = require('./routes/learning');
-const { router: progressRouter } = require('./routes/progress');
-const { router: activityRouter } = require('./routes/activity');
-const charactersRouter = require('./routes/characters');
-const gamificationRouter = require('./routes/gamification');
+// MongoDB Routes
+const progressRouter = require('./mongodb/routes/progress').router;
+const activityRouter = require('./mongodb/routes/activity').router;
+const charactersRouter = require('./mongodb/routes/characters');
+const gamificationRouter = require('./mongodb/routes/gamification');
+const answersRouter = require('./mongodb/routes/answers');
+const conceptsRouter = require('./mongodb/routes/concepts');
+const unitsRouter = require('./mongodb/routes/units');
+const vocaRouter = require('./mongodb/routes/voca');
+const problemsRouter = require('./mongodb/routes/problems');
+const bookmarksRouter = require('./mongodb/routes/bookmarks');
+const diagnosticsRouter = require('./mongodb/routes/diagnostics');
+const learningRouter = require('./mongodb/routes/learning');
+
+// MySQL Routes
+const authRouter = require('./mysql/routes/auth');
+
+// 공통 Routes
+const uploadRouter = require('./s3/routes/upload');
 
 // 라우터 사용
 app.use('/v1/problems', problemsRouter);
@@ -61,6 +73,14 @@ app.use('/v1/progress', progressRouter);
 app.use('/v1/activity', activityRouter);
 app.use('/v1/characters', charactersRouter);
 app.use('/v1/gamification', gamificationRouter);
+
+// MySQL 인증 라우터
+app.use('/v1/auth', authRouter);
+console.log('🔧 인증 라우터 등록됨: /v1/auth');
+
+// 업로드 라우터
+app.use('/v1/upload', uploadRouter);
+console.log('🔧 업로드 라우터 등록됨: /v1/upload');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다!`);

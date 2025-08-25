@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { LearningTimeLog } = require('../models');
+const { LearningTimeLog, Unit } = require('../models');
 
 // 3-1. 학습 활동 시작
 router.post('/start', async (req, res) => {
@@ -122,6 +122,35 @@ router.get('/active', async (req, res) => {
 
   } catch (error) {
     console.error('Error checking active session:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 30분 타임아웃 처리 API
+router.post('/timeout', async (req, res) => {
+  try {
+    const inactiveSessions = await LearningTimeLog.find({
+      endedAt: null,
+      startedAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) } // 30분 이상
+    });
+    
+    let timeoutCount = 0;
+    for (const session of inactiveSessions) {
+      const now = new Date();
+      const durationSeconds = Math.floor((now - session.startedAt) / 1000);
+      
+      session.endedAt = now;
+      session.durationSeconds = durationSeconds;
+      await session.save();
+      timeoutCount++;
+    }
+    
+    res.json({ 
+      timeoutCount: timeoutCount,
+      message: `${timeoutCount}개의 세션이 타임아웃으로 종료되었습니다.`
+    });
+  } catch (error) {
+    console.error('Error processing timeout:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

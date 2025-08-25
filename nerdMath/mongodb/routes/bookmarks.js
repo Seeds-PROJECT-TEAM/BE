@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Bookmark, Problem, Unit, ProblemSet } = require('../models');
+const { Bookmark, Problem, Voca } = require('../models');
 
 // 2-1. 북마크 토글
 router.post('/toggle', async (req, res) => {

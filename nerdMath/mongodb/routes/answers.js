@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { Problem, AnswerAttempt, Unit, LearningTimeLog, Voca } = require('../models');
+const { AnswerAttempt, Problem, Voca, ActivityLog } = require('../models');
+const { getStatus } = require('./progress');
 const { awardXp } = require('../utils/gamification');
 
 // 채점 + 해설 API
@@ -167,19 +168,39 @@ router.post('/check', async (req, res) => {
     // DB에 저장
     await answerAttempt.save();
 
-    // 학습 시간 기록 종료 (문제 풀이 완료)
-    const activeSession = await LearningTimeLog.findOne({
-      userId: parseInt(userId),
-      endedAt: null
-    });
-
-    if (activeSession) {
-      const now = new Date();
-      const durationSeconds = Math.floor((now - activeSession.startedAt) / 1000);
+    // 학습 시간 기록 종료 (문제별 세션)
+    if (mode === 'vocab_test') {
+      // 어휘 테스트 세션 종료
+      const vocabSession = await LearningTimeLog.findOne({
+        userId: parseInt(userId),
+        activityType: 'vocab_test',
+        endedAt: null
+      });
       
-      activeSession.endedAt = now;
-      activeSession.durationSeconds = durationSeconds;
-      await activeSession.save();
+      if (vocabSession) {
+        const now = new Date();
+        const durationSeconds = Math.floor((now - vocabSession.startedAt) / 1000);
+        
+        vocabSession.endedAt = now;
+        vocabSession.durationSeconds = durationSeconds;
+        await vocabSession.save();
+      }
+    } else if (mode === 'practice') {
+      // 문제 풀이 세션 종료
+      const problemSession = await LearningTimeLog.findOne({
+        userId: parseInt(userId),
+        activityType: 'problem_solving',
+        endedAt: null
+      });
+      
+      if (problemSession) {
+        const now = new Date();
+        const durationSeconds = Math.floor((now - problemSession.startedAt) / 1000);
+        
+        problemSession.endedAt = now;
+        problemSession.durationSeconds = durationSeconds;
+        await problemSession.save();
+      }
     }
 
     // 진행률 업데이트
@@ -192,33 +213,67 @@ router.post('/check', async (req, res) => {
       const { updateActivityStats } = require('./activity');
       
       if (mode === 'vocab_test') {
-        // 어휘 테스트 완료 시 해당 단원/카테고리의 어휘를 100% 완료로 설정
-        
         // 어휘 데이터 확인
         const voca = await Voca.findById(vocaId);
         
         if (voca.category === 'math_term' && voca.unitId && unit) {
-          // 소단원별 어휘: 테스트 완료 = 해당 단원 어휘 100% 완료
-          updatedProgress = await updateProgress(parseInt(userId), unit._id, 'vocab', 100, 'unit');
+          // 해당 단원의 모든 어휘를 다 풀었는지 확인
+          const totalVocabsInUnit = await Voca.countDocuments({ 
+            unitId: unit._id, 
+            category: 'math_term' 
+          });
+          
+          const solvedVocabsInUnit = await AnswerAttempt.countDocuments({
+            userId: parseInt(userId),
+            unitId: unit._id,
+            mode: 'vocab_test'
+          });
+          
+          // 모든 어휘를 다 풀었을 때만 100%로 설정
+          if (solvedVocabsInUnit >= totalVocabsInUnit) {
+            updatedProgress = await updateProgress(parseInt(userId), unit._id, 'vocab', 100, 'unit');
+          }
           
         } else if (voca.category === 'sat_act') {
-          // 빈출 어휘: 테스트 완료 = 빈출 어휘 100% 완료
-          updatedProgress = await updateProgress(parseInt(userId), null, 'vocab', 100, 'frequent');
+          // 빈출 어휘: 해당 카테고리의 모든 어휘를 다 풀었는지 확인
+          const totalFrequentVocabs = await Voca.countDocuments({ 
+            category: 'sat_act' 
+          });
+          
+          const solvedFrequentVocabs = await AnswerAttempt.countDocuments({
+            userId: parseInt(userId),
+            mode: 'vocab_test',
+            vocaId: { $in: await Voca.find({ category: 'sat_act' }).distinct('_id') }
+          });
+          
+          // 모든 빈출 어휘를 다 풀었을 때만 100%로 설정
+          if (solvedFrequentVocabs >= totalFrequentVocabs) {
+            updatedProgress = await updateProgress(parseInt(userId), null, 'vocab', 100, 'frequent');
+          }
         }
         
       } else if (mode === 'practice') {
-        // 문제 풀이 진행률 계산
-        const totalProblemsInUnit = await Problem.countDocuments({ unitId: unit._id });
-        const solvedProblemsInUnit = await AnswerAttempt.countDocuments({
+        // 해당 문제를 이전에 푼 적이 있는지 확인
+        const existingAttempt = await AnswerAttempt.findOne({
           userId: parseInt(userId),
-          unitId: unit._id,
+          problemId: problemId,
           mode: { $ne: 'diagnostic' }
         });
-        
-        const problemProgress = Math.round((solvedProblemsInUnit / totalProblemsInUnit) * 100);
-        console.log('Debug - 문제 진행률 계산:', { solvedProblemsInUnit, totalProblemsInUnit, problemProgress });
-        updatedProgress = await updateProgress(parseInt(userId), unit._id, 'problem', problemProgress);
-        console.log('Debug - 문제 진행률 업데이트 완료:', updatedProgress);
+
+        // 이전에 푼 적이 없는 문제만 진행률에 반영
+        if (!existingAttempt) {
+          const totalProblemsInUnit = await Problem.countDocuments({ unitId: unit._id });
+          const solvedProblemsInUnit = await AnswerAttempt.countDocuments({
+            userId: parseInt(userId),
+            unitId: unit._id,
+            mode: { $ne: 'diagnostic' }
+          });
+          
+          const problemProgress = Math.round((solvedProblemsInUnit / totalProblemsInUnit) * 100);
+          console.log('Debug - 문제 진행률 계산:', { solvedProblemsInUnit, totalProblemsInUnit, problemProgress });
+          updatedProgress = await updateProgress(parseInt(userId), unit._id, 'problem', problemProgress);
+          console.log('Debug - 문제 진행률 업데이트 완료:', updatedProgress);
+        }
       }
       // diagnostic 모드는 진행률 업데이트 제외
 

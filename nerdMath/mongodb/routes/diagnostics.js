@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { DiagnosticTest, DiagnosticAnalysis, ProblemSet, Problem, AnswerAttempt, Unit } = require('../models');
+const { DiagnosticTest, DiagnosticAnalysis, Unit, ProblemSet, Problem, AnswerAttempt } = require('../models');
 
 // 타임아웃 체크 함수
 async function checkTimeout(diagnosticTest) {
@@ -155,7 +155,7 @@ router.post('/start', async (req, res) => {
         startedAt: new Date(),
         completed: false,
         restartCount: 0,
-        timeoutMinutes: 30,
+        timeoutMinutes: 60,
         shuffleSeed: Math.floor(Math.random() * 1000000)
       });
 
@@ -171,7 +171,6 @@ router.post('/start', async (req, res) => {
       userId: parseInt(userId),
       gradeRange: gradeRange,
       startedAt: diagnosticTest.startedAt,
-      selectedRuleSnapshot: diagnosticTest.selectedRuleSnapshot,
       firstProblemId: firstProblem._id,
       totalProblems: problemSet.problemIds.length,
       isRestart: isRestart,
@@ -505,8 +504,16 @@ router.post('/:testId/restart', async (req, res) => {
       return res.status(409).json({ error: 'Cannot restart completed test' });
     }
 
+    // 재시작 횟수 제한 확인 (최대 2회)
+    if (diagnosticTest.restartCount >= 2) {
+      return res.status(403).json({
+        error: '재시작 횟수 제한을 초과했습니다'
+      });
+    }
+
     // 재시작 처리
     diagnosticTest.restartCount += 1;
+    diagnosticTest.startedAt = new Date(); // 시간 초기화
     
     // 2회 이상 재시작 시 새로운 셔플 시드 생성
     if (diagnosticTest.restartCount >= 2) {

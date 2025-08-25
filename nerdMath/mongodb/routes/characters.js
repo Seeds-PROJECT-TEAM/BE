@@ -1,8 +1,7 @@
 const express = require('express');
-const Character = require('../models/Character');
-const { getGamificationState } = require('../utils/gamification');
-
 const router = express.Router();
+const { Character, GamificationState } = require('../models');
+const { getGamificationState } = require('../utils/gamification');
 
 // 테스트용 기본 라우트
 router.get('/', (req, res) => {

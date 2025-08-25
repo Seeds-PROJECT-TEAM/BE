@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Progress, Unit, AnswerAttempt, Voca } = require('../models');
+const { Progress, Unit, Concept, Problem, Voca, AnswerAttempt } = require('../models');
 
 // 헬퍼 함수들
 function getStatus(progress) {
@@ -24,19 +24,17 @@ async function calculateOverallProgress(userId) {
       };
     }
 
-    // 완료된 소단원 수 계산 (개념, 문제, 어휘 모두 100%인 단원)
-    const completedUnits = unitProgress.filter(p => 
-      p.conceptProgress === 100 && 
-      p.problemProgress === 100 && 
-      p.vocabProgress === 100
-    ).length;
+    // 각 영역별 완료된 소단원 수 계산
+    const conceptCompletedUnits = unitProgress.filter(p => p.conceptProgress === 100).length;
+    const problemCompletedUnits = unitProgress.filter(p => p.problemProgress === 100).length;
 
-    // 전체 진행률 = 완료한 소단원 수 / 97 (총 소단원 수, 빈출 어휘 제외)
-    const totalProgress = Number(((completedUnits / 97) * 100).toFixed(2));
+    // 각 영역별 진행률 계산
+    const totalConceptProgress = Number(((conceptCompletedUnits / 97) * 100).toFixed(2));
+    const totalProblemProgress = Number(((problemCompletedUnits / 97) * 100).toFixed(2));
 
     return {
-      totalConceptProgress: totalProgress,
-      totalProblemProgress: totalProgress
+      totalConceptProgress: totalConceptProgress,
+      totalProblemProgress: totalProblemProgress
     };
   } catch (error) {
     console.error('Error calculating overall progress:', error);

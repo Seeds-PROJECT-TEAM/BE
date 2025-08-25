@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Concept, Unit, LearningTimeLog } = require('../models');
+const { Concept, Unit, LearningTimeLog, Progress } = require('../models');
 const { awardXp } = require('../utils/gamification');
 
 // 소단원별 개념 조회 API
@@ -52,17 +52,20 @@ router.post('/:unitId/concept/complete', async (req, res) => {
       return res.status(404).json({ error: 'Unit not found' });
     }
 
-    // 학습 시간 기록 종료 (learningTimeId가 제공된 경우에만)
-    if (learningTimeId) {
-      const learningSession = await LearningTimeLog.findById(learningTimeId);
-      if (learningSession && !learningSession.endedAt) {
-        const now = new Date();
-        const durationSeconds = Math.floor((now - learningSession.startedAt) / 1000);
-        
-        learningSession.endedAt = now;
-        learningSession.durationSeconds = durationSeconds;
-        await learningSession.save();
-      }
+    // 학습 시간 기록 종료 (개념 학습 세션)
+    const conceptSession = await LearningTimeLog.findOne({
+      userId: parseInt(userId),
+      activityType: 'concept_learning',
+      endedAt: null
+    });
+    
+    if (conceptSession) {
+      const now = new Date();
+      const durationSeconds = Math.floor((now - conceptSession.startedAt) / 1000);
+      
+      conceptSession.endedAt = now;
+      conceptSession.durationSeconds = durationSeconds;
+      await conceptSession.save();
     }
 
     // 진행률 업데이트 (100%로 설정)

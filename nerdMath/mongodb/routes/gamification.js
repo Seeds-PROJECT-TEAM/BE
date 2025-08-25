@@ -1,8 +1,6 @@
 const express = require('express');
-const XpTransaction = require('../models/XpTransaction');
-const GamificationState = require('../models/GamificationState');
-
 const router = express.Router();
+const { XpTransaction, GamificationState } = require('../models');
 
 /**
  * XP 획득 이력 조회

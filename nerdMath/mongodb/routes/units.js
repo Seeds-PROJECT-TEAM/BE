@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Unit, Problem, ProblemSet, AnswerAttempt } = require('../models');
+const { Unit, ProblemSet, Problem, AnswerAttempt } = require('../models');
 
 // 문제 정렬 함수
 function sortProblemsByCognitiveType(problems) {
@@ -23,7 +23,7 @@ function sortProblemsByCognitiveType(problems) {
 // 소단원 목록 조회 (대단원별 필터링)
 router.get('/', async (req, res) => {
   try {
-    const { grade, chapter, cursor, limit = 20 } = req.query;
+    const { grade, chapter, cursor, limit = 40 } = req.query;
     
     // 필수 파라미터 검증
     if (!grade || !chapter) {
@@ -51,8 +51,28 @@ router.get('/', async (req, res) => {
     // 다음 커서 계산
     const nextCursor = units.length > 0 ? units[units.length - 1].orderInGrade : null;
 
+    // 응답 데이터 변환
+    const formattedUnits = units.map(unit => ({
+      unitId: unit.unitId,
+      subject: unit.subject || 'math',
+      title: {
+        ko: unit.title,
+        en: unit.titleEn || unit.title
+      },
+      grade: unit.grade,
+      chapter: unit.chapter,
+      chapterTitle: unit.chapterTitle || `제${unit.chapter}장`,
+      orderInGrade: unit.orderInGrade,
+      description: {
+        ko: unit.description || '',
+        en: unit.descriptionEn || unit.description || ''
+      },
+      status: unit.status,
+      createdAt: unit.createdAt ? unit.createdAt.toISOString() : new Date().toISOString()
+    }));
+
     res.json({
-      items: units,
+      items: formattedUnits,
       nextCursor: nextCursor
     });
   } catch (error) {
@@ -76,7 +96,26 @@ router.get('/:unitId', async (req, res) => {
       });
     }
 
-    res.json(unit);
+    // 응답 데이터 변환
+    const formattedUnit = {
+      unitId: unit.unitId,
+      subject: unit.subject || 'math',
+      title: {
+        ko: unit.title,
+        en: unit.titleEn || unit.title
+      },
+      grade: unit.grade,
+      chapter: unit.chapter,
+      chapterTitle: unit.chapterTitle || `제${unit.chapter}장`,
+      orderInGrade: unit.orderInGrade,
+      description: {
+        ko: unit.description || '',
+        en: unit.descriptionEn || unit.description || ''
+      },
+      status: unit.status
+    };
+
+    res.json(formattedUnit);
   } catch (error) {
     console.error('Error fetching unit:', error);
     res.status(500).json({
@@ -165,13 +204,22 @@ router.get('/:unitId/first-problem', async (req, res) => {
     const response = {
       problem: targetProblem ? {
         problemId: targetProblem._id.toString(),
-        unitId: targetProblem.unitId ? targetProblem.unitId.toString() : unitId,
+        unitId: targetProblem.unitId ? targetProblem.unitId.toString() : unit._id.toString(),
         grade: targetProblem.grade,
         chapter: targetProblem.chapter,
-        context: targetProblem.context,
-        cognitiveType: targetProblem.cognitiveType,
-        level: targetProblem.level,
-        type: targetProblem.type,
+        context: {
+          source: targetProblem.context?.source || "교과서",
+          for: targetProblem.context?.for || ["diagnostic"]
+        },
+        cognitiveType: targetProblem.cognitiveType === 'understanding' ? '이해' : 
+                      targetProblem.cognitiveType === 'application' ? '적용' : 
+                      targetProblem.cognitiveType === 'analysis' ? '응용' : targetProblem.cognitiveType,
+        level: targetProblem.level === 'easy' ? '하' : 
+               targetProblem.level === 'medium' ? '중' : 
+               targetProblem.level === 'hard' ? '상' : targetProblem.level,
+        type: targetProblem.type === 'multiple_choice' ? '객관식' : 
+              targetProblem.type === 'short_answer' ? '단답식' : 
+              targetProblem.type === 'essay' ? '서술형' : targetProblem.type,
         tags: targetProblem.tags,
         content: {
           stem: { text: targetProblem.content.question },
@@ -187,7 +235,7 @@ router.get('/:unitId/first-problem', async (req, res) => {
       problemIds: sortedProblemIds,
       progress: progress,
       sortedBy: "cognitiveType",
-      sortOrder: ["understanding", "application", "analysis"],
+      sortOrder: ["이해", "적용", "응용"],
       isFirstTime: isFirstTime
     };
 

@@ -1,6 +1,4 @@
-const GamificationState = require('../models/GamificationState');
-const XpTransaction = require('../models/XpTransaction');
-const Character = require('../models/Character');
+const { Character, GamificationState, XpTransaction } = require('../models');
 
 // 레벨업 기준 XP 테이블 (방법 3)
 const LEVEL_XP_REQUIREMENTS = {

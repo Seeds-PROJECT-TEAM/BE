@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Voca, Unit, AnswerAttempt } = require('../models');
+const { Voca, Unit } = require('../models');
 
 // 1. 단원별 어휘 배열 조회
 router.get('/unit/:unitId', async (req, res) => {
@@ -82,7 +82,7 @@ router.get('/common/:type', async (req, res) => {
 // 3. 어휘 테스트 생성
 router.get('/test', async (req, res) => {
   try {
-    const { unitId, testSize = 10 } = req.query;
+    const { unitId, testSize } = req.query;
 
     if (!unitId) {
       return res.status(400).json({ error: 'unitId is required' });
@@ -105,10 +105,13 @@ router.get('/test', async (req, res) => {
       return res.status(404).json({ error: 'No vocabularies found for this unit' });
     }
 
-    // 랜덤하게 어휘 선택 (testSize만큼)
+    // testSize가 지정되지 않으면 모든 어휘 사용, 지정되면 해당 개수만큼 사용
+    const finalTestSize = testSize ? Math.min(parseInt(testSize), vocabularies.length) : vocabularies.length;
+    
+    // 랜덤하게 어휘 선택
     const selectedVocabularies = vocabularies
       .sort(() => 0.5 - Math.random())
-      .slice(0, Math.min(testSize, vocabularies.length));
+      .slice(0, finalTestSize);
 
     // 문제 생성 (영어→한글, 한글→영어 랜덤)
     const problems = selectedVocabularies.map((voca, index) => {
@@ -160,24 +163,26 @@ router.get('/review/unit/:unitId', async (req, res) => {
       return res.status(404).json({ error: 'Unit not found' });
     }
 
-    // 해당 단원의 틀린 어휘들 조회 (MongoDB Aggregation)
+    // 해당 단원의 최신 틀린 어휘들 조회 (MongoDB Aggregation)
     const incorrectVocabularies = await AnswerAttempt.aggregate([
       { $match: { 
         userId: parseInt(userId), 
         mode: 'vocab_test',
         unitId: unit._id 
       }},
+      // 각 어휘별로 최신 시도 기록만 가져오기
+      { $sort: { scoredAt: -1 } },
       { $group: {
         _id: '$vocaId',
-        totalAttempts: { $sum: 1 },
-        correctAttempts: { $sum: { $cond: ['$isCorrect', 1, 0] } },
-        lastAttempted: { $max: '$scoredAt' }
+        latestAttempt: { $first: '$$ROOT' }
+      }},
+      // 최신 시도가 틀린 것만 필터링
+      { $match: {
+        'latestAttempt.isCorrect': false
       }},
       { $addFields: {
-        accuracy: { $divide: ['$correctAttempts', '$totalAttempts'] }
-      }},
-      { $match: {
-        accuracy: { $lt: 1.0 } // 100% 정답률이 아닌 것들만
+        vocaId: '$_id',
+        lastAttempted: '$latestAttempt.scoredAt'
       }},
       { $lookup: {
         from: 'vocas',
@@ -192,9 +197,6 @@ router.get('/review/unit/:unitId', async (req, res) => {
         meaning: '$vocabInfo.meaning',
         etymology: '$vocabInfo.etymology',
         imageUrl: '$vocabInfo.imageUrl',
-        totalAttempts: 1,
-        correctAttempts: 1,
-        accuracy: 1,
         lastAttempted: 1
       }}
     ]);
@@ -234,7 +236,7 @@ router.get('/review/common/:type', async (req, res) => {
       return res.status(400).json({ error: 'Invalid type. Use sat_act' });
     }
 
-    // 해당 카테고리의 틀린 어휘들 조회 (MongoDB Aggregation)
+    // 해당 카테고리의 최신 틀린 어휘들 조회 (MongoDB Aggregation)
     const incorrectVocabularies = await AnswerAttempt.aggregate([
       { $match: { 
         userId: parseInt(userId), 
@@ -250,28 +252,26 @@ router.get('/review/common/:type', async (req, res) => {
       { $match: {
         'vocabInfo.category': type
       }},
+      // 각 어휘별로 최신 시도 기록만 가져오기
+      { $sort: { scoredAt: -1 } },
       { $group: {
         _id: '$vocaId',
-        totalAttempts: { $sum: 1 },
-        correctAttempts: { $sum: { $cond: ['$isCorrect', 1, 0] } },
-        lastAttempted: { $max: '$scoredAt' },
-        vocabInfo: { $first: '$vocabInfo' }
+        latestAttempt: { $first: '$$ROOT' }
+      }},
+      // 최신 시도가 틀린 것만 필터링
+      { $match: {
+        'latestAttempt.isCorrect': false
       }},
       { $addFields: {
-        accuracy: { $divide: ['$correctAttempts', '$totalAttempts'] }
-      }},
-      { $match: {
-        accuracy: { $lt: 1.0 } // 100% 정답률이 아닌 것들만
+        vocaId: '$_id',
+        lastAttempted: '$latestAttempt.scoredAt'
       }},
       { $project: {
         vocaId: '$_id',
-        word: '$vocabInfo.word',
-        meaning: '$vocabInfo.meaning',
-        etymology: '$vocabInfo.etymology',
-        imageUrl: '$vocabInfo.imageUrl',
-        totalAttempts: 1,
-        correctAttempts: 1,
-        accuracy: 1,
+        word: '$latestAttempt.vocabInfo.word',
+        meaning: '$latestAttempt.vocabInfo.meaning',
+        etymology: '$latestAttempt.vocabInfo.etymology',
+        imageUrl: '$latestAttempt.vocabInfo.imageUrl',
         lastAttempted: 1
       }}
     ]);
