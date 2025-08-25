@@ -36,7 +36,13 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          mkdir -p /home/ubuntu/nerdMath
           cd /home/ubuntu/nerdMath
-          git pull origin main
-          docker-compose down
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/Seeds-PROJECT-TEAM/BE.git .
+          else
+            git pull origin main
+          fi
+          cd nerdMath
+          docker-compose down || true
           docker-compose up -d --build
