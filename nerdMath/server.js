@@ -17,6 +17,11 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// favicon.ico 요청 처리 (404 오류 방지)
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end(); // No Content 응답
+});
+
 // 모든 요청에 대한 로깅 미들웨어 추가
 app.use((req, res, next) => {
   console.log(`📥 ${req.method} ${req.url} - ${new Date().toISOString()}`);
