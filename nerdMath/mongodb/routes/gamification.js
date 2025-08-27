@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { XpTransaction, GamificationState } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 /**
  * XP 획득 이력 조회
@@ -11,9 +12,7 @@ router.get('/xp-history', async (req, res) => {
     const { userId, limit = 20, page = 1 } = req.query;
     
     if (!userId) {
-      return res.status(400).json({
-        error: 'userId parameter is required'
-      });
+      return res.status(400).json(createHttpError(400, 'userId 파라미터는 필수입니다', ['userId']));
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -45,7 +44,7 @@ router.get('/xp-history', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching XP history:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, 'XP 히스토리 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -58,9 +57,7 @@ router.get('/level-history', async (req, res) => {
     const { userId } = req.query;
     
     if (!userId) {
-      return res.status(400).json({
-        error: 'userId parameter is required'
-      });
+      return res.status(400).json(createHttpError(400, 'userId 파라미터는 필수입니다', ['userId']));
     }
 
     const gamificationState = await GamificationState.findOne({ userId: parseInt(userId) });
@@ -109,7 +106,7 @@ router.get('/level-history', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching level history:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '레벨 히스토리 조회 중 오류가 발생했습니다'));
   }
 });
 

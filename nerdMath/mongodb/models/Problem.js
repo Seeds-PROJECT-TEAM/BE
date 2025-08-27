@@ -64,6 +64,13 @@ const problemSchema = new mongoose.Schema({
   diagnosticTest: {
     type: Boolean,
     default: false
+  },
+  diagnosticUnit: {
+    type: String,
+    enum: ['middle_1', 'middle_1_2', 'middle_1_3'],
+    required: function() {
+      return this.diagnosticTest === true; // 진단테스트용인 경우에만 필수
+    }
   }
 }, {
   timestamps: true // createdAt, updatedAt auto-generation
@@ -76,5 +83,6 @@ problemSchema.index({ problem_id: 1 });
 problemSchema.index({ level: 1 });
 problemSchema.index({ cognitiveType: 1 });
 problemSchema.index({ diagnosticTest: 1 });
+problemSchema.index({ diagnosticUnit: 1 });
 
 module.exports = mongoose.model('Problem', problemSchema);

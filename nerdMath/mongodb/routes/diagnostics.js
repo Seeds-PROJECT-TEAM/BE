@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { DiagnosticTest, DiagnosticAnalysis, Unit, ProblemSet, Problem, AnswerAttempt } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 타임아웃 체크 함수
 async function checkTimeout(diagnosticTest) {
@@ -39,7 +40,7 @@ router.get('/eligibility', async (req, res) => {
     const { userId } = req.query;
     
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 완료된 진단 테스트가 있는지 확인
@@ -64,7 +65,7 @@ router.get('/eligibility', async (req, res) => {
 
   } catch (error) {
     console.error('Error checking diagnostic eligibility:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 자격 확인 중 오류가 발생했습니다'));
   }
 });
 
@@ -75,7 +76,7 @@ router.post('/start', async (req, res) => {
     const { gradeRange, rule } = req.body;
     
     if (!userId || !gradeRange) {
-      return res.status(400).json({ error: 'userId and gradeRange are required' });
+      return res.status(400).json(createHttpError(400, 'userId와 gradeRange는 필수입니다', ['userId', 'gradeRange']));
     }
 
     // 자격 확인 - 완료된 테스트가 있으면 재시작 불가
@@ -85,9 +86,7 @@ router.post('/start', async (req, res) => {
     });
 
     if (completedTest) {
-      return res.status(403).json({
-        error: '이미 진단 테스트를 완료했습니다'
-      });
+      return res.status(403).json(createHttpError(403, '이미 진단 테스트를 완료했습니다'));
     }
 
     // 진행 중인 테스트가 있는지 확인
@@ -119,30 +118,24 @@ router.post('/start', async (req, res) => {
       diagnosticTest = existingTest;
     }
 
-    // 학년 범위에 맞는 진단 테스트용 Unit 조회
+    // 학년 범위에 맞는 진단 테스트용 ProblemSet 조회
     const diagnosticUnitMap = {
-      '1': 'diagnostic_middle_1',
-      '1-2': 'diagnostic_middle_1_2',
-      '1-3': 'diagnostic_middle_1_3'
+      '1': 'middle_1',
+      '1-2': 'middle_1_2',
+      '1-3': 'middle_1_3'
     };
 
     const unitKey = `${gradeRange.min}-${gradeRange.max}`;
-    const unitIdString = diagnosticUnitMap[unitKey] || diagnosticUnitMap['1-3']; // 기본값
-
-    // Unit을 먼저 조회해서 _id를 얻음
-    const unit = await Unit.findOne({ unitId: unitIdString });
-    if (!unit) {
-      return res.status(404).json({ error: '해당 학년 범위의 진단 테스트 Unit이 없습니다' });
-    }
+    const diagnosticUnit = diagnosticUnitMap[unitKey] || diagnosticUnitMap['1-3']; // 기본값
 
     // ProblemSet 조회
     const problemSet = await ProblemSet.findOne({
       mode: 'diagnostic',
-      unitId: unit._id
+      diagnosticUnit: diagnosticUnit
     });
 
     if (!problemSet) {
-      return res.status(404).json({ error: '해당 학년 범위의 진단 테스트 세트가 없습니다' });
+      return res.status(404).json(createHttpError(404, '해당 학년 범위의 진단 테스트 세트가 없습니다'));
     }
 
     if (!isRestart) {
@@ -180,7 +173,7 @@ router.post('/start', async (req, res) => {
 
   } catch (error) {
     console.error('Error starting diagnostic test:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 테스트 시작 중 오류가 발생했습니다'));
   }
 });
 
@@ -191,17 +184,17 @@ router.get('/:testId/status', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const diagnosticTest = await DiagnosticTest.findById(testId);
 
     if (!diagnosticTest) {
-      return res.status(404).json({ error: 'Diagnostic test not found' });
+      return res.status(404).json(createHttpError(404, '진단 테스트를 찾을 수 없습니다', ['testId']));
     }
 
     if (diagnosticTest.userId !== parseInt(userId)) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json(createHttpError(403, '권한이 없습니다'));
     }
 
     // 답안 개수 조회
@@ -238,7 +231,7 @@ router.get('/:testId/status', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting diagnostic status:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 상태 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -250,7 +243,7 @@ router.post('/:testId/submit', async (req, res) => {
     const { problemId, userAnswer, durationSeconds } = req.body;
 
     if (!userId || !problemId || !userAnswer) {
-      return res.status(400).json({ error: 'userId, problemId, and userAnswer are required' });
+      return res.status(400).json(createHttpError(400, 'userId, problemId, userAnswer는 필수입니다', ['userId', 'problemId', 'userAnswer']));
     }
 
     const diagnosticTest = await DiagnosticTest.findById(testId);
@@ -264,19 +257,19 @@ router.post('/:testId/submit', async (req, res) => {
     }
 
     if (diagnosticTest.completed) {
-      return res.status(409).json({ error: 'Diagnostic test already completed' });
+      return res.status(409).json(createHttpError(409, '진단 테스트가 이미 완료되었습니다'));
     }
 
     // 타임아웃 체크
     const isTimeout = await checkTimeout(diagnosticTest);
     if (isTimeout) {
-      return res.status(408).json({ error: 'Diagnostic test timed out' });
+      return res.status(408).json(createHttpError(408, '진단 테스트가 타임아웃되었습니다'));
     }
 
     // 문제 조회해서 unitId 가져오기
     const problem = await Problem.findById(problemId);
     if (!problem) {
-      return res.status(404).json({ error: 'Problem not found' });
+      return res.status(404).json(createHttpError(404, '문제를 찾을 수 없습니다', ['problemId']));
     }
 
     // 답안 저장 (채점 안 함)
@@ -320,7 +313,7 @@ router.post('/:testId/submit', async (req, res) => {
 
   } catch (error) {
     console.error('Error submitting answer:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '답안 제출 중 오류가 발생했습니다'));
   }
 });
 
@@ -332,27 +325,27 @@ router.post('/:testId/complete', async (req, res) => {
     const { endedAt, completed } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const diagnosticTest = await DiagnosticTest.findById(testId);
 
     if (!diagnosticTest) {
-      return res.status(404).json({ error: 'Diagnostic test not found' });
+      return res.status(404).json(createHttpError(404, '진단 테스트를 찾을 수 없습니다', ['testId']));
     }
 
     if (diagnosticTest.userId !== parseInt(userId)) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json(createHttpError(403, '권한이 없습니다'));
     }
 
     if (diagnosticTest.completed) {
-      return res.status(409).json({ error: 'Diagnostic test already completed' });
+      return res.status(409).json(createHttpError(409, '진단 테스트가 이미 완료되었습니다'));
     }
 
     // 타임아웃 체크
     const isTimeout = await checkTimeout(diagnosticTest);
     if (isTimeout) {
-      return res.status(408).json({ error: 'Diagnostic test timed out' });
+      return res.status(408).json(createHttpError(408, '진단 테스트가 타임아웃되었습니다'));
     }
 
     // 진단 테스트 완료 처리
@@ -400,7 +393,7 @@ router.post('/:testId/complete', async (req, res) => {
 
     const score = Math.round((correctCount / answers.length) * 100);
 
-    // FastAPI로 분석 요청 데이터 전송 (실제 구현에서는 HTTP 요청)
+    // FastAPI로 분석 요청 데이터 전송
     const analysisData = {
       testId: diagnosticTest._id,
       userId: parseInt(userId),
@@ -411,6 +404,29 @@ router.post('/:testId/complete', async (req, res) => {
     };
 
     console.log('Sending analysis data to FastAPI:', analysisData);
+
+    // FastAPI 호출
+    try {
+      const fastApiResponse = await fetch('http://fastapi-url/api/learning-path/express/diagnostic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Token': 'test-token'
+        },
+        body: JSON.stringify(analysisData)
+      });
+
+      if (fastApiResponse.ok) {
+        const analysisResult = await fastApiResponse.json();
+        console.log('FastAPI 분석 완료:', analysisResult.success);
+      } else {
+        console.error('FastAPI 분석 실패:', fastApiResponse.status);
+        // FastAPI 호출 실패해도 진단 완료는 성공으로 처리
+      }
+    } catch (fastApiError) {
+      console.error('FastAPI 호출 중 오류:', fastApiError);
+      // FastAPI 호출 실패해도 진단 완료는 성공으로 처리
+    }
 
     res.json({
       testId: diagnosticTest._id,
@@ -426,7 +442,7 @@ router.post('/:testId/complete', async (req, res) => {
 
   } catch (error) {
     console.error('Error completing diagnostic test:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 테스트 완료 중 오류가 발생했습니다'));
   }
 });
 
@@ -437,17 +453,17 @@ router.get('/:testId/analysis', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const diagnosticTest = await DiagnosticTest.findById(testId);
 
     if (!diagnosticTest) {
-      return res.status(404).json({ error: 'Diagnostic test not found' });
+      return res.status(404).json(createHttpError(404, '진단 테스트를 찾을 수 없습니다', ['testId']));
     }
 
     if (diagnosticTest.userId !== parseInt(userId)) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json(createHttpError(403, '권한이 없습니다'));
     }
 
     // 분석 결과 조회
@@ -476,11 +492,61 @@ router.get('/:testId/analysis', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting diagnostic analysis:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 분석 결과 조회 중 오류가 발생했습니다'));
   }
 });
 
-// 1-7. 진단 테스트 재시작
+// 1-7. 진단 분석 결과 조회
+router.get('/:userId/analysis', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
+    }
+
+    // 1. 최신 진단 테스트 조회
+    const latestTest = await DiagnosticTest.findOne({
+      userId: parseInt(userId)
+    }).sort({ completedAt: -1 });
+
+    // 2. 진단 테스트가 없으면 404
+    if (!latestTest) {
+      return res.status(404).json(createHttpError(404, '진단 테스트를 찾을 수 없습니다', ['userId']));
+    }
+
+    // 3. 분석 결과 조회
+    const analysis = await DiagnosticAnalysis.findOne({
+      testId: latestTest._id
+    });
+
+    // 4. 분석 결과가 없으면 "분석 중"
+    if (!analysis) {
+      return res.status(202).json({
+        status: 'analyzing',
+        message: '분석 중입니다. 잠시만 기다려주세요.',
+        estimatedCompletionTime: new Date(Date.now() + 5 * 60 * 1000) // 5분 후
+      });
+    }
+
+    // 5. 분석 결과 있으면 정상 응답
+    res.json({
+      analysisId: analysis.analysisId,
+      testId: analysis.testId,
+      userId: analysis.userId,
+      aiComment: analysis.aiComment,
+      class: analysis.class,
+      recommendedPath: analysis.recommendedPath,
+      generatedAt: analysis.generatedAt
+    });
+
+  } catch (error) {
+    console.error('Error getting diagnostic analysis:', error);
+    res.status(500).json(createHttpError(500, '진단 분석 결과 조회 중 오류가 발생했습니다'));
+  }
+});
+
+// 1-8. 진단 테스트 재시작
 router.post('/:testId/restart', async (req, res) => {
   try {
     const { testId } = req.params;
@@ -501,14 +567,12 @@ router.post('/:testId/restart', async (req, res) => {
     }
 
     if (diagnosticTest.completed) {
-      return res.status(409).json({ error: 'Cannot restart completed test' });
+      return res.status(409).json(createHttpError(409, '완료된 테스트는 재시작할 수 없습니다'));
     }
 
     // 재시작 횟수 제한 확인 (최대 2회)
     if (diagnosticTest.restartCount >= 2) {
-      return res.status(403).json({
-        error: '재시작 횟수 제한을 초과했습니다'
-      });
+      return res.status(403).json(createHttpError(403, '재시작 횟수 제한을 초과했습니다'));
     }
 
     // 재시작 처리
@@ -545,7 +609,7 @@ router.post('/:testId/restart', async (req, res) => {
 
   } catch (error) {
     console.error('Error restarting diagnostic test:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진단 테스트 재시작 중 오류가 발생했습니다'));
   }
 });
 
@@ -570,7 +634,7 @@ router.get('/:testId/timeout-check', async (req, res) => {
     }
 
     if (diagnosticTest.completed) {
-      return res.status(409).json({ error: 'Test already completed' });
+      return res.status(409).json(createHttpError(409, '테스트가 이미 완료되었습니다'));
     }
 
     // 타임아웃 체크
@@ -598,7 +662,7 @@ router.get('/:testId/timeout-check', async (req, res) => {
 
   } catch (error) {
     console.error('Error checking timeout:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '타임아웃 확인 중 오류가 발생했습니다'));
   }
 });
 

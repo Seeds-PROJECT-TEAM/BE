@@ -7,6 +7,7 @@ const { pool } = require('../config/database');
 const EmailService = require('../utils/emailService');
 const ValidationUtils = require('../utils/validation');
 const { verifyToken } = require('../middleware/auth');
+const { createHttpError, ERROR_CODES } = require('../../mongodb/utils/errorHandler');
 
 // 1. 이메일 인증 코드 발송
 router.post('/send-verification', async (req, res) => {
@@ -16,20 +17,13 @@ router.post('/send-verification', async (req, res) => {
 
     // 필수 필드 검증
     if (!email) {
-      return res.status(400).json({
-        error: 'Missing required field',
-        message: '이메일은 필수 필드입니다.'
-      });
+      return res.status(400).json(createHttpError(400, '이메일은 필수 필드입니다', ['email']));
     }
 
     // 입력 검증
     const validationErrors = ValidationUtils.validateEmailVerificationData({ email });
     if (validationErrors.length > 0) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: '입력 데이터가 올바르지 않습니다.',
-        details: validationErrors
-      });
+      return res.status(400).json(createHttpError(400, '입력 데이터가 올바르지 않습니다', validationErrors));
     }
 
     // 이미 가입된 이메일인지 확인
@@ -38,10 +32,7 @@ router.post('/send-verification', async (req, res) => {
       [email]
     );
     if (existingUsers.length > 0) {
-      return res.status(409).json({
-        error: 'Email already registered',
-        message: '이미 가입된 이메일입니다.'
-      });
+      return res.status(409).json(createHttpError(409, '이미 가입된 이메일입니다', ['email']));
     }
 
     // 기존 인증 코드가 있으면 제거
@@ -61,10 +52,7 @@ router.post('/send-verification', async (req, res) => {
     const emailResult = await EmailService.sendVerificationCode(email, verification.code);
 
     if (!emailResult.success) {
-      return res.status(500).json({
-        error: 'Email sending failed',
-        message: emailResult.message
-      });
+      return res.status(500).json(createHttpError(500, emailResult.message || '이메일 발송에 실패했습니다'));
     }
 
     res.status(200).json({
@@ -75,10 +63,7 @@ router.post('/send-verification', async (req, res) => {
 
   } catch (error) {
     console.error('Send verification error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '인증 코드 발송 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '인증 코드 발송 중 오류가 발생했습니다'));
   }
 });
 
@@ -89,10 +74,7 @@ router.post('/check-verification', async (req, res) => {
 
     // 필수 필드 검증
     if (!email || !code) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: '이메일과 인증 코드는 필수 필드입니다.'
-      });
+      return res.status(400).json(createHttpError(400, '이메일과 인증 코드는 필수 필드입니다', ['email', 'code']));
     }
 
     // 입력 검증
@@ -112,20 +94,14 @@ router.post('/check-verification', async (req, res) => {
     );
     
     if (verificationRows.length === 0) {
-      return res.status(404).json({
-        error: 'Verification not found',
-        message: '인증 코드를 찾을 수 없습니다.'
-      });
+      return res.status(404).json(createHttpError(404, '인증 코드를 찾을 수 없습니다', ['code']));
     }
 
     const verification = verificationRows[0];
     
     // 이미 사용된 코드인지 확인
     if (verification.isUsed) {
-      return res.status(422).json({
-        error: 'Verification already used',
-        message: '이미 인증된 코드입니다.'
-      });
+      return res.status(422).json(createHttpError(422, '이미 인증된 코드입니다', ['code']));
     }
 
     // 인증 코드를 사용됨으로 표시
@@ -141,10 +117,7 @@ router.post('/check-verification', async (req, res) => {
 
   } catch (error) {
     console.error('Check verification error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '인증 코드 확인 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '인증 코드 확인 중 오류가 발생했습니다'));
   }
 });
 
@@ -169,11 +142,7 @@ router.post('/register', async (req, res) => {
     const missingFields = Object.keys(requiredFields).filter(field => !requiredFields[field]);
     
     if (missingFields.length > 0) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: '필수 필드가 누락되었습니다.',
-        details: missingFields.map(field => `${field}은(는) 필수 필드입니다.`)
-      });
+      return res.status(400).json(createHttpError(400, '필수 필드가 누락되었습니다', missingFields));
     }
 
     // 입력 검증
@@ -191,11 +160,7 @@ router.post('/register', async (req, res) => {
     });
 
     if (validationErrors.length > 0) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: '입력 데이터가 올바르지 않습니다.',
-        details: validationErrors
-      });
+      return res.status(400).json(createHttpError(400, '입력 데이터가 올바르지 않습니다', validationErrors));
     }
 
     // 이메일 중복 확인
@@ -204,10 +169,7 @@ router.post('/register', async (req, res) => {
       [email]
     );
     if (existingUsers.length > 0) {
-      return res.status(409).json({
-        error: 'Email already exists',
-        message: '이미 가입된 이메일입니다.'
-      });
+      return res.status(409).json(createHttpError(409, '이미 가입된 이메일입니다', ['email']));
     }
 
     // 이메일 인증 확인
@@ -216,10 +178,7 @@ router.post('/register', async (req, res) => {
       [email]
     );
     if (verificationRows.length === 0) {
-      return res.status(403).json({
-        error: 'Email not verified',
-        message: '이메일 인증이 필요합니다.'
-      });
+      return res.status(403).json(createHttpError(403, '이메일 인증이 필요합니다', ['email']));
     }
 
     // 비밀번호 해싱
@@ -252,10 +211,7 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '회원가입 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '회원가입 중 오류가 발생했습니다'));
   }
 });
 
@@ -266,20 +222,13 @@ router.post('/login', async (req, res) => {
 
     // 필수 필드 검증
     if (!email || !password) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: '이메일과 비밀번호는 필수 필드입니다.'
-      });
+      return res.status(400).json(createHttpError(400, '이메일과 비밀번호는 필수 필드입니다', ['email', 'password']));
     }
 
     // 입력 검증
     const validationErrors = ValidationUtils.validateLoginData({ email, password });
     if (validationErrors.length > 0) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: '입력 데이터가 올바르지 않습니다.',
-        details: validationErrors
-      });
+      return res.status(400).json(createHttpError(400, '입력 데이터가 올바르지 않습니다', validationErrors));
     }
 
     // 사용자 찾기
@@ -288,10 +237,7 @@ router.post('/login', async (req, res) => {
       [email]
     );
     if (users.length === 0) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
-      });
+      return res.status(401).json(createHttpError(401, '이메일 또는 비밀번호가 올바르지 않습니다', ['email', 'password']));
     }
 
     const user = users[0];
@@ -300,18 +246,36 @@ router.post('/login', async (req, res) => {
     const bcrypt = require('bcryptjs');
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
-      });
+      return res.status(401).json(createHttpError(401, '이메일 또는 비밀번호가 올바르지 않습니다', ['email', 'password']));
     }
 
     // 이메일 인증 확인
     if (!user.emailVerified) {
-      return res.status(403).json({
-        error: 'Email not verified',
-        message: '이메일 인증이 필요합니다.'
+      return res.status(403).json(createHttpError(403, '이메일 인증이 필요합니다', ['email']));
+    }
+
+    // 출석 체크 (일일 첫 로그인 시에만)
+    try {
+      const { updateActivityStats } = require('../../mongodb/routes/activity');
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      // 오늘 날짜의 활동 로그 확인
+      const { ActivityLog } = require('../../mongodb/models');
+      const todayActivity = await ActivityLog.findOne({
+        userId: user.userId,
+        date: today
       });
+      
+      // 오늘 처음 로그인하는 경우에만 출석 카운트 증가
+      if (!todayActivity || todayActivity.attendanceCount === 0) {
+        await updateActivityStats(user.userId, today, {
+          attendanceCount: 1
+        });
+        console.log(`출석 체크 완료: userId ${user.userId}, date ${today}`);
+      }
+    } catch (attendanceError) {
+      console.error('출석 체크 중 오류:', attendanceError);
+      // 출석 체크 실패해도 로그인은 계속 진행
     }
 
     // 기존 토큰 무효화
@@ -342,10 +306,7 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '로그인 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '로그인 중 오류가 발생했습니다'));
   }
 });
 
@@ -366,10 +327,7 @@ router.post('/logout', verifyToken, async (req, res) => {
 
   } catch (error) {
     console.error('Logout error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '로그아웃 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '로그아웃 중 오류가 발생했습니다'));
   }
 });
 
@@ -384,10 +342,7 @@ router.get('/profile', verifyToken, async (req, res) => {
       [userId]
     );
     if (users.length === 0) {
-      return res.status(404).json({
-        error: 'User not found',
-        message: '사용자를 찾을 수 없습니다.'
-      });
+      return res.status(404).json(createHttpError(404, '사용자를 찾을 수 없습니다', ['userId']));
     }
 
     const user = users[0];
@@ -406,10 +361,7 @@ router.get('/profile', verifyToken, async (req, res) => {
 
   } catch (error) {
     console.error('Profile error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: '사용자 정보 조회 중 오류가 발생했습니다.'
-    });
+    res.status(500).json(createHttpError(500, '사용자 정보 조회 중 오류가 발생했습니다'));
   }
 });
 

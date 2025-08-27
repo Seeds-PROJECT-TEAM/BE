@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ActivityLog, AnswerAttempt, LearningTimeLog } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 3-6. 활동 통계 조회
 router.get('/stats', async (req, res) => {
@@ -9,7 +10,7 @@ router.get('/stats', async (req, res) => {
     const { date } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const targetDate = date || new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -45,7 +46,7 @@ router.get('/stats', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting activity stats:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '활동 통계 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -100,7 +101,7 @@ router.post('/update', async (req, res) => {
     const { userId, date, updates } = req.body;
 
     if (!userId || !date || !updates) {
-      return res.status(400).json({ error: 'userId, date, updates are required' });
+      return res.status(400).json(createHttpError(400, 'userId, date, updates는 필수입니다', ['userId', 'date', 'updates']));
     }
 
     const activityLog = await updateActivityStats(userId, date, updates);
@@ -116,7 +117,7 @@ router.post('/update', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating activity stats:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '활동 통계 업데이트 중 오류가 발생했습니다'));
   }
 });
 

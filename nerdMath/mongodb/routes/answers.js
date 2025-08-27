@@ -3,6 +3,7 @@ const router = express.Router();
 const { AnswerAttempt, Problem, Voca, ActivityLog } = require('../models');
 const { getStatus } = require('./progress');
 const { awardXp } = require('../utils/gamification');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 채점 + 해설 API
 router.post('/check', async (req, res) => {
@@ -23,23 +24,17 @@ router.post('/check', async (req, res) => {
 
     // 필수 필드 검증
     if (!mode || !userAnswer || !userAnswer.value || !userId) {
-      return res.status(422).json({ 
-        error: 'Missing required fields: mode, userAnswer.value, userId' 
-      });
+      return res.status(422).json(createHttpError(422, '필수 필드가 누락되었습니다: mode, userAnswer.value, userId', ['mode', 'userAnswer.value', 'userId']));
     }
     
     // mode에 따른 필수 필드 검증
     if (mode === 'vocab_test') {
       if (!vocaId) {
-        return res.status(422).json({ 
-          error: 'Missing required fields: vocaId for vocab_test mode' 
-        });
+        return res.status(422).json(createHttpError(422, 'vocab_test 모드에서는 vocaId가 필수입니다', ['vocaId']));
       }
     } else {
       if (!problemId) {
-        return res.status(422).json({ 
-          error: 'Missing required fields: problemId for non-vocab_test mode' 
-        });
+        return res.status(422).json(createHttpError(422, 'vocab_test가 아닌 모드에서는 problemId가 필수입니다', ['problemId']));
       }
     }
 
@@ -48,7 +43,7 @@ router.post('/check', async (req, res) => {
     if (unitId) {
       unit = await Unit.findById(unitId);
       if (!unit) {
-        return res.status(404).json({ error: 'Unit not found' });
+        return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
       }
     }
 
@@ -59,11 +54,11 @@ router.post('/check', async (req, res) => {
     if (mode === 'vocab_test') {
       // 어휘 테스트: vocaId로 조회
       if (!vocaId) {
-        return res.status(400).json({ error: 'vocaId is required for vocab_test mode' });
+        return res.status(400).json(createHttpError(400, 'vocab_test 모드에서는 vocaId가 필요합니다', ['vocaId']));
       }
       voca = await Voca.findById(vocaId);
       if (!voca) {
-        return res.status(404).json({ error: 'Vocabulary not found' });
+        return res.status(404).json(createHttpError(404, '어휘를 찾을 수 없습니다', ['vocaId']));
       }
     } else {
           // 일반 문제: Problem 조회
@@ -71,7 +66,7 @@ router.post('/check', async (req, res) => {
     problem = await Problem.findById(problemId);
     console.log('Debug - Problem 조회 결과:', problem ? '찾음' : '없음');
     if (!problem) {
-      return res.status(404).json({ error: 'Problem not found' });
+      return res.status(404).json(createHttpError(404, '문제를 찾을 수 없습니다', ['problemId']));
     }
     }
 
@@ -79,10 +74,9 @@ router.post('/check', async (req, res) => {
     if (idempotencyKey) {
       const existingAttempt = await AnswerAttempt.findOne({ idempotencyKey });
       if (existingAttempt) {
-        return res.status(409).json({ 
-          error: 'Duplicate request detected',
+        return res.status(409).json(createHttpError(409, '중복 요청이 감지되었습니다', ['idempotencyKey'], null, {
           answerId: existingAttempt._id.toString()
-        });
+        }));
       }
     }
 
@@ -354,7 +348,7 @@ router.post('/check', async (req, res) => {
 
   } catch (error) {
     console.error('Error in answer check:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '답안 체크 중 오류가 발생했습니다'));
   }
 });
 

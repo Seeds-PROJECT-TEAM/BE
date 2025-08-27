@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Progress, Unit, Concept, Problem, Voca, AnswerAttempt } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 헬퍼 함수들
 function getStatus(progress) {
@@ -110,7 +111,7 @@ router.get('/overall', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     console.log('Debug - API 호출됨, userId:', userId);
@@ -140,7 +141,7 @@ router.get('/overall', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting overall progress:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '전체 진행률 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -152,7 +153,7 @@ router.get('/concepts', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 모든 단원 조회
@@ -184,7 +185,7 @@ router.get('/concepts', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting concepts progress:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '개념 진행률 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -194,7 +195,7 @@ router.get('/problems', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 모든 단원 조회
@@ -226,7 +227,7 @@ router.get('/problems', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting problems progress:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '문제 진행률 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -236,7 +237,7 @@ router.get('/vocab', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 모든 단원 조회
@@ -285,7 +286,7 @@ router.get('/vocab', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting vocab progress:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '어휘 진행률 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -346,7 +347,7 @@ router.post('/update', async (req, res) => {
     const { userId, unitId, activityType, progressValue } = req.body;
 
     if (!userId || !unitId || !activityType || progressValue === undefined) {
-      return res.status(400).json({ error: 'userId, unitId, activityType, progressValue are required' });
+      return res.status(400).json(createHttpError(400, 'userId, unitId, activityType, progressValue는 필수입니다', ['userId', 'unitId', 'activityType', 'progressValue']));
     }
 
     const progress = await updateProgress(userId, unitId, activityType, progressValue);
@@ -361,7 +362,7 @@ router.post('/update', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating progress:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '진행률 업데이트 중 오류가 발생했습니다'));
   }
 });
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Concept, Unit, LearningTimeLog, Progress } = require('../models');
 const { awardXp } = require('../utils/gamification');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 소단원별 개념 조회 API
 router.get('/:unitId/concept', async (req, res) => {
@@ -11,13 +12,13 @@ router.get('/:unitId/concept', async (req, res) => {
     // 단위 조회
     const unit = await Unit.findById(unitId);
     if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 개념 조회
     const concept = await Concept.findOne({ unitId: unitId });
     if (!concept) {
-      return res.status(404).json({ error: 'Concept not found for this unit' });
+      return res.status(404).json(createHttpError(404, '해당 단원의 개념을 찾을 수 없습니다', ['unitId']));
     }
 
     // 응답 구성
@@ -32,7 +33,7 @@ router.get('/:unitId/concept', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching concept:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '개념 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -43,13 +44,13 @@ router.post('/:unitId/concept/complete', async (req, res) => {
     const { userId, learningTimeId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 단원 존재 확인
     const unit = await Unit.findById(unitId);
     if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 학습 시간 기록 종료 (개념 학습 세션)
@@ -114,7 +115,7 @@ router.post('/:unitId/concept/complete', async (req, res) => {
 
   } catch (error) {
     console.error('Error completing concept learning:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '개념 학습 완료 중 오류가 발생했습니다'));
   }
 });
 

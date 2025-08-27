@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { Voca, Unit } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
-// 1. 단원별 어휘 배열 조회
-router.get('/unit/:unitId', async (req, res) => {
-  try {
-    const { unitId } = req.params;
+  // 1. 단원별 어휘 배열 조회
+  router.get('/unit/:unitId', async (req, res) => {
+    try {
+      const { unitId } = req.params;
 
-    // 단위 조회
-    const unit = await Unit.findById(unitId);
-    if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
-    }
+      // 단위 조회
+      const unit = await Unit.findById(unitId);
+      if (!unit) {
+        return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
+      }
 
     // 해당 단원의 어휘들 조회
     const vocabularies = await Voca.find({ 
@@ -38,7 +39,7 @@ router.get('/unit/:unitId', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching unit vocabularies:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '단원별 어휘 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -49,7 +50,7 @@ router.get('/common/:type', async (req, res) => {
 
     // 유효한 타입인지 확인
     if (!['sat_act'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid type. Use sat_act' });
+      return res.status(400).json(createHttpError(400, '유효하지 않은 타입입니다. sat_act를 사용하세요', ['type']));
     }
 
     // 해당 카테고리의 어휘들 조회
@@ -75,7 +76,7 @@ router.get('/common/:type', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching common vocabularies:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '빈출 어휘 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -85,13 +86,13 @@ router.get('/test', async (req, res) => {
     const { unitId, testSize } = req.query;
 
     if (!unitId) {
-      return res.status(400).json({ error: 'unitId is required' });
+      return res.status(400).json(createHttpError(400, 'unitId는 필수입니다', ['unitId']));
     }
 
     // 단위 조회
     const unit = await Unit.findById(unitId);
     if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 해당 단원의 어휘들 조회
@@ -102,7 +103,7 @@ router.get('/test', async (req, res) => {
     });
 
     if (vocabularies.length === 0) {
-      return res.status(404).json({ error: 'No vocabularies found for this unit' });
+      return res.status(404).json(createHttpError(404, '이 단원에 대한 어휘를 찾을 수 없습니다', ['unitId']));
     }
 
     // testSize가 지정되지 않으면 모든 어휘 사용, 지정되면 해당 개수만큼 사용
@@ -143,7 +144,7 @@ router.get('/test', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating vocab test:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '어휘 테스트 생성 중 오류가 발생했습니다'));
   }
 });
 
@@ -154,13 +155,13 @@ router.get('/review/unit/:unitId', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 단위 조회
     const unit = await Unit.findById(unitId);
     if (!unit) {
-      return res.status(404).json({ error: 'Unit not found' });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 해당 단원의 최신 틀린 어휘들 조회 (MongoDB Aggregation)
@@ -217,7 +218,7 @@ router.get('/review/unit/:unitId', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching review vocabularies:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '복습 어휘 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -228,12 +229,12 @@ router.get('/review/common/:type', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 유효한 타입인지 확인
     if (!['sat_act'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid type. Use sat_act' });
+      return res.status(400).json(createHttpError(400, '유효하지 않은 타입입니다. sat_act를 사용하세요', ['type']));
     }
 
     // 해당 카테고리의 최신 틀린 어휘들 조회 (MongoDB Aggregation)
@@ -291,7 +292,7 @@ router.get('/review/common/:type', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching common review vocabularies:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '빈출 복습 어휘 조회 중 오류가 발생했습니다'));
   }
 });
 

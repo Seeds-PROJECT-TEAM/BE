@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Character, GamificationState } = require('../models');
 const { getGamificationState } = require('../utils/gamification');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 테스트용 기본 라우트
 router.get('/', (req, res) => {
@@ -20,9 +21,7 @@ router.get('/default', async (req, res) => {
     console.log('gender:', gender);
     
     if (!gender || !['male', 'female'].includes(gender)) {
-      return res.status(400).json({
-        error: 'Gender parameter is required and must be "male" or "female"'
-      });
+      return res.status(400).json(createHttpError(400, 'gender 파라미터는 필수이며 "male" 또는 "female"이어야 합니다', ['gender']));
     }
 
     console.log('Character 모델 조회 시작');
@@ -48,7 +47,7 @@ router.get('/default', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching default characters:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    res.status(500).json(createHttpError(500, '기본 캐릭터 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -61,9 +60,7 @@ router.get('/my', async (req, res) => {
     const { userId } = req.query;
     
     if (!userId) {
-      return res.status(400).json({
-        error: 'userId parameter is required'
-      });
+      return res.status(400).json(createHttpError(400, 'userId 파라미터는 필수입니다', ['userId']));
     }
 
     const { gamificationState, equippedCharacter } = await getGamificationState(parseInt(userId));
@@ -91,7 +88,7 @@ router.get('/my', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching user character:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '사용자 캐릭터 조회 중 오류가 발생했습니다'));
   }
 });
 

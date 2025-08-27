@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Bookmark, Problem, Voca } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 2-1. 북마크 토글
 router.post('/toggle', async (req, res) => {
@@ -9,13 +10,13 @@ router.post('/toggle', async (req, res) => {
     const { problemId } = req.body;
 
     if (!userId || !problemId) {
-      return res.status(400).json({ error: 'userId and problemId are required' });
+      return res.status(400).json(createHttpError(400, 'userId와 problemId는 필수입니다', ['userId', 'problemId']));
     }
 
     // 문제 존재 확인
     const problem = await Problem.findById(problemId);
     if (!problem) {
-      return res.status(404).json({ error: 'Problem not found' });
+      return res.status(404).json(createHttpError(404, '문제를 찾을 수 없습니다', ['problemId']));
     }
 
     // 기존 북마크 확인
@@ -55,7 +56,7 @@ router.post('/toggle', async (req, res) => {
 
   } catch (error) {
     console.error('Error toggling bookmark:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '북마크 토글 중 오류가 발생했습니다'));
   }
 });
 
@@ -65,7 +66,7 @@ router.get('/', async (req, res) => {
     const { userId, unitId, startDate, endDate } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 필터 조건 구성
@@ -104,7 +105,7 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting bookmarks:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '북마크 목록 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -115,7 +116,7 @@ router.post('/review', async (req, res) => {
     const { unitId, mode = 'individual' } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     // 필터 조건
@@ -128,7 +129,7 @@ router.post('/review', async (req, res) => {
     const bookmarks = await Bookmark.find(filter);
     
     if (bookmarks.length === 0) {
-      return res.status(404).json({ error: '북마크한 문제가 없습니다' });
+      return res.status(404).json(createHttpError(404, '북마크한 문제가 없습니다'));
     }
 
     const problemIds = bookmarks.map(b => b.problemId);
@@ -161,7 +162,7 @@ router.post('/review', async (req, res) => {
 
   } catch (error) {
     console.error('Error starting bookmark review:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '북마크 복습 시작 중 오류가 발생했습니다'));
   }
 });
 
@@ -172,7 +173,7 @@ router.get('/:problemId/status', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const bookmark = await Bookmark.findOne({
@@ -196,7 +197,7 @@ router.get('/:problemId/status', async (req, res) => {
 
   } catch (error) {
     console.error('Error checking bookmark status:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '북마크 상태 확인 중 오류가 발생했습니다'));
   }
 });
 

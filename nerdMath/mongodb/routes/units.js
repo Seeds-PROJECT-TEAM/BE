@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Unit, ProblemSet, Problem, AnswerAttempt } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 문제 정렬 함수
 function sortProblemsByCognitiveType(problems) {
@@ -27,9 +28,7 @@ router.get('/', async (req, res) => {
     
     // 필수 파라미터 검증
     if (!grade || !chapter) {
-      return res.status(400).json({
-        error: 'grade and chapter are required'
-      });
+      return res.status(400).json(createHttpError(400, 'grade와 chapter는 필수입니다', ['grade', 'chapter']));
     }
 
     // 쿼리 조건 구성
@@ -77,9 +76,7 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching units:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json(createHttpError(500, '단원 목록 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -91,9 +88,7 @@ router.get('/:unitId', async (req, res) => {
     const unit = await Unit.findOne({ unitId });
     
     if (!unit) {
-      return res.status(404).json({
-        error: 'Unit not found'
-      });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 응답 데이터 변환
@@ -118,9 +113,7 @@ router.get('/:unitId', async (req, res) => {
     res.json(formattedUnit);
   } catch (error) {
     console.error('Error fetching unit:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json(createHttpError(500, '단원 조회 중 오류가 발생했습니다'));
   }
 });
 
@@ -133,17 +126,13 @@ router.get('/:unitId/first-problem', async (req, res) => {
     // 소단원 존재 확인
     const unit = await Unit.findOne({ unitId });
     if (!unit) {
-      return res.status(404).json({
-        error: 'Unit not found'
-      });
+      return res.status(404).json(createHttpError(404, '단원을 찾을 수 없습니다', ['unitId']));
     }
 
     // 해당 소단원의 문제세트 찾기
     const problemSet = await ProblemSet.findOne({ unitId: unit._id });
     if (!problemSet || !problemSet.problemIds || problemSet.problemIds.length === 0) {
-      return res.status(404).json({
-        error: 'No problem set found for this unit'
-      });
+      return res.status(404).json(createHttpError(404, '이 단원에 대한 문제 세트를 찾을 수 없습니다', ['unitId']));
     }
 
     // 모든 문제 조회
@@ -247,9 +236,7 @@ router.get('/:unitId/first-problem', async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error('Error fetching first problem:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json(createHttpError(500, '첫 번째 문제 조회 중 오류가 발생했습니다'));
   }
 });
 

@@ -36,6 +36,11 @@ const problemSetSchema = new mongoose.Schema({
     type: String,
     enum: ['diagnostic', 'unit', 'vocab_test']
   },
+  diagnosticUnit: {
+    type: String,
+    enum: ['middle_1', 'middle_1_2', 'middle_1_3'],
+    required: false // 일반 문제 세트는 null
+  },
   title: {
     type: String
   }

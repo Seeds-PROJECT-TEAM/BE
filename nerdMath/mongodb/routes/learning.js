@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { LearningTimeLog, Unit } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 3-1. 학습 활동 시작
 router.post('/start', async (req, res) => {
@@ -9,7 +10,7 @@ router.post('/start', async (req, res) => {
     const { activityType, contentId, sessionId } = req.body;
 
     if (!userId || !activityType || !contentId) {
-      return res.status(400).json({ error: 'userId, activityType, contentId are required' });
+      return res.status(400).json(createHttpError(400, 'userId, activityType, contentId는 필수입니다', ['userId', 'activityType', 'contentId']));
     }
 
     // 기존 활성 세션이 있다면 종료 처리
@@ -47,7 +48,7 @@ router.post('/start', async (req, res) => {
 
   } catch (error) {
     console.error('Error starting learning session:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '학습 세션 시작 중 오류가 발생했습니다'));
   }
 });
 
@@ -57,17 +58,17 @@ router.post('/end', async (req, res) => {
     const { learningTimeId } = req.body;
 
     if (!learningTimeId) {
-      return res.status(400).json({ error: 'learningTimeId is required' });
+      return res.status(400).json(createHttpError(400, 'learningTimeId는 필수입니다', ['learningTimeId']));
     }
 
     const learningSession = await LearningTimeLog.findById(learningTimeId);
     
     if (!learningSession) {
-      return res.status(404).json({ error: 'Learning session not found' });
+      return res.status(404).json(createHttpError(404, '학습 세션을 찾을 수 없습니다', ['learningTimeId']));
     }
 
     if (learningSession.endedAt) {
-      return res.status(409).json({ error: 'Learning session already ended' });
+      return res.status(409).json(createHttpError(409, '학습 세션이 이미 종료되었습니다'));
     }
 
     const now = new Date();
@@ -85,7 +86,7 @@ router.post('/end', async (req, res) => {
 
   } catch (error) {
     console.error('Error ending learning session:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '학습 세션 종료 중 오류가 발생했습니다'));
   }
 });
 
@@ -95,7 +96,7 @@ router.get('/active', async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(400).json(createHttpError(400, 'userId는 필수입니다', ['userId']));
     }
 
     const activeSession = await LearningTimeLog.findOne({
@@ -122,7 +123,7 @@ router.get('/active', async (req, res) => {
 
   } catch (error) {
     console.error('Error checking active session:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '활성 세션 확인 중 오류가 발생했습니다'));
   }
 });
 
@@ -151,7 +152,7 @@ router.post('/timeout', async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing timeout:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json(createHttpError(500, '타임아웃 처리 중 오류가 발생했습니다'));
   }
 });
 

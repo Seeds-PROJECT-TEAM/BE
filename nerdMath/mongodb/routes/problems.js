@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Problem } = require('../models');
+const { createHttpError, ERROR_CODES } = require('../utils/errorHandler');
 
 // 문제 단건 조회 API (API 명세에 맞춤)
 router.get('/:problemId', async (req, res) => {
@@ -19,9 +20,7 @@ router.get('/:problemId', async (req, res) => {
     }
     
     if (!problem) {
-      return res.status(404).json({
-        error: 'Problem not found'
-      });
+      return res.status(404).json(createHttpError(404, '문제를 찾을 수 없습니다', ['problemId']));
     }
 
     // API 명세에 맞는 응답 형식
@@ -59,9 +58,7 @@ router.get('/:problemId', async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error('Error fetching problem:', error);
-    res.status(500).json({
-      error: 'Internal server error'
-    });
+    res.status(500).json(createHttpError(500, '문제 조회 중 오류가 발생했습니다'));
   }
 });
 
