@@ -174,11 +174,11 @@ router.post('/register', async (req, res) => {
 
     // 이메일 인증 확인
     const [verificationRows] = await pool.execute(
-      'SELECT * FROM email_verifications WHERE email = ? AND isUsed = 1',
+      'SELECT * FROM email_verifications WHERE email = ? AND isUsed = 1 AND expiresAt > NOW()',
       [email]
     );
     if (verificationRows.length === 0) {
-      return res.status(403).json(createHttpError(403, '이메일 인증이 필요합니다', ['email']));
+      return res.status(403).json(createHttpError(403, '이메일 인증이 필요합니다. 인증 코드를 확인해주세요.', ['email']));
     }
 
     // 비밀번호 해싱
@@ -194,7 +194,7 @@ router.post('/register', async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         email, hashedPassword, name, birthDate, phoneNumber, nickname,
-        gender, true, agreeTerms, agreePrivacy, agreeMarketing
+        gender, false, agreeTerms, agreePrivacy, agreeMarketing
       ]
     );
 
