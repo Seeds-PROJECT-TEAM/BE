@@ -86,9 +86,7 @@ class ValidationUtils {
       errors.push('성별은 male 또는 female이어야 합니다.');
     }
 
-    // 약관 동의 검증
-    if (!data.agreeTerms) errors.push('서비스 이용약관에 동의해야 합니다.');
-    if (!data.agreePrivacy) errors.push('개인정보 수집·이용에 동의해야 합니다.');
+    // 약관 동의 검증 제거 - 자동으로 true로 설정됨
 
     return errors;
   }

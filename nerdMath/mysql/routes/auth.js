@@ -152,10 +152,7 @@ router.post('/register', async (req, res) => {
       birthDate,
       phoneNumber,
       nickname,
-      gender,
-      agreeTerms,
-      agreePrivacy,
-      agreeMarketing
+      gender
     } = req.body;
 
     // 필수 필드 검증
@@ -174,10 +171,7 @@ router.post('/register', async (req, res) => {
       birthDate,
       phoneNumber,
       nickname,
-      gender,
-      agreeTerms,
-      agreePrivacy,
-      agreeMarketing
+      gender
     });
 
     if (validationErrors.length > 0) {
@@ -215,7 +209,7 @@ router.post('/register', async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         email, hashedPassword, name, birthDate, phoneNumber, nickname,
-        gender, false, agreeTerms, agreePrivacy, agreeMarketing
+        gender, false, true, true, false
       ]
     );
 
