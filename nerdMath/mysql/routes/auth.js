@@ -53,6 +53,14 @@ router.post('/send-verification', async (req, res) => {
     console.log('📧 받는 사람:', email);
     console.log('🔢 인증 코드:', verification.code);
     
+    // 환경변수 디버깅
+    console.log('🔍 환경변수 확인:');
+    console.log('AWS_REGION:', process.env.AWS_REGION);
+    console.log('AWS_ACCESS_KEY_ID:', process.env.AWS_ACCESS_KEY_ID ? '설정됨' : '설정되지 않음');
+    console.log('AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY ? '설정됨' : '설정되지 않음');
+    console.log('FROM_EMAIL:', process.env.FROM_EMAIL);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     // AWS SES 설정 문제로 임시 콘솔 출력
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📧 [테스트용] 이메일 인증 코드');
@@ -61,11 +69,8 @@ router.post('/send-verification', async (req, res) => {
     console.log('⏰ 만료 시간:', verification.expiresAt);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // 실제 이메일 발송 (AWS 설정 완료 후 주석 해제)
+    // 실제 이메일 발송
     const emailResult = await EmailService.sendVerificationCode(email, verification.code);
-    
-    // 임시 Mock 응답 (AWS 설정 전까지)
-    // const emailResult = { success: true, messageId: 'test-message-id' };
 
     if (!emailResult.success) {
       return res.status(500).json(createHttpError(500, emailResult.message || '이메일 발송에 실패했습니다'));
