@@ -37,4 +37,13 @@ jobs:
           cd /home/ubuntu/nerdMath
           git pull origin main
           docker-compose down
+          # 환경변수와 함께 컨테이너 재시작
           docker-compose up -d --build
+          # 또는 직접 Docker 명령어로 환경변수 전달
+          # docker stop nerdmath-app || true
+          # docker run -d -p 3000:3000 \
+          #   -e AWS_REGION=${{ secrets.AWS_REGION }} \
+          #   -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          #   -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+          #   -e FROM_EMAIL=${{ secrets.FROM_EMAIL }} \
+          #   --name nerdmath-app nerdmath

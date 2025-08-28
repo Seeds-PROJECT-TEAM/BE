@@ -48,8 +48,24 @@ router.post('/send-verification', async (req, res) => {
       [email, verification.code, verification.expiresAt]
     );
 
-    // 이메일 발송 (Mock)
+    // 이메일 발송
+    console.log('🔍 이메일 발송 시작...');
+    console.log('📧 받는 사람:', email);
+    console.log('🔢 인증 코드:', verification.code);
+    
+    // AWS SES 설정 문제로 임시 콘솔 출력
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 [테스트용] 이메일 인증 코드');
+    console.log('📮 받는 사람:', email);
+    console.log('🔢 인증 코드:', verification.code);
+    console.log('⏰ 만료 시간:', verification.expiresAt);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // 실제 이메일 발송 (AWS 설정 완료 후 주석 해제)
     const emailResult = await EmailService.sendVerificationCode(email, verification.code);
+    
+    // 임시 Mock 응답 (AWS 설정 전까지)
+    // const emailResult = { success: true, messageId: 'test-message-id' };
 
     if (!emailResult.success) {
       return res.status(500).json(createHttpError(500, emailResult.message || '이메일 발송에 실패했습니다'));

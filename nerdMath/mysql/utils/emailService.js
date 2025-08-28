@@ -14,9 +14,14 @@ function createSESClient() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // 환경 변수 사용 (하드코딩 제거)
-  const awsRegion = process.env.AWS_REGION;
+  const awsRegion = process.env.AWS_REGION || 'ap-northeast-2';
   const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
+  // 필수 환경변수 체크
+  if (!awsAccessKeyId || !awsSecretAccessKey) {
+    throw new Error('AWS_ACCESS_KEY_ID 또는 AWS_SECRET_ACCESS_KEY가 설정되지 않았습니다.');
+  }
 
   console.log('🔧 사용할 AWS 설정:');
   console.log('Region:', awsRegion);
