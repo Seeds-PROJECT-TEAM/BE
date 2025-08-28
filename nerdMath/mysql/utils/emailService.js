@@ -14,7 +14,7 @@ function createSESClient() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // 환경 변수 사용 (하드코딩 제거)
-  const awsRegion = process.env.AWS_REGION || 'ap-northeast-2';
+  const awsRegion = process.env.AWS_REGION || 'ap-southeast-2';
   const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
 

@@ -7,13 +7,11 @@ services:
       - "3002:3002"
     environment:
       - NODE_ENV=production
-      - PORT=3002
-      - AWS_REGION=${AWS_REGION}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - FROM_EMAIL=${FROM_EMAIL}
-    env_file:
-      - .env
+      - PORT=3000
+      - AWS_REGION=ap-southeast-2
+      - AWS_ACCESS_KEY_ID=AKIA4LPCDVFRFFSSLQGD
+      - AWS_SECRET_ACCESS_KEY=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
+      - FROM_EMAIL=56j78@naver.com
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
